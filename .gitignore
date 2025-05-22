@@ -1,0 +1,20 @@
+# Wirtualne środowisko
+venv/
+
+# Katalog fabryka
+fabryka/
+
+# Plik z zmiennymi środowiskowymi
+.env
+
+# Katalog debug
+debug/
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+
+# Logi i tymczasowe
+*.log
+*.tmp
+
