@@ -18,3 +18,8 @@ __pycache__/
 *.log
 *.tmp
 
+# Inne pliki
+flags.json
+payload.json
+raw_classification.json
+wynik.json
