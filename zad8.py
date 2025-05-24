@@ -89,13 +89,15 @@ target_hints = [
 # Do promptu dorzucamy kontekst legendarnej zatopionej wyspy opisana przez Platona,
 # dokładnie nakazujemy zwracać jedynie wynik - samą nazwę krainy.
 system_prompt = (
+    f"Jesteś polskim ekspertem od historii i mitologii. "
     f"Masz zaszyfrowany ciąg '{raw_flag_fragment}'. Ignoruj znaki '?'. "
     f"Wskazówki: {target_hints[0]}, {target_hints[1]}, {target_hints[2]}. "
     "Szukana kraina to legendarna zatopiona wyspa z opowieści Platona. "
-    "Odpowiedz WYŁĄCZNIE jedną nazwą krainy po polsku, bez dodatkowych komentarzy."
+    "Odpowiadasz zawsze po polsku, używając polskich nazw miejsc i krain. "
+    "Podaj tylko polską nazwę tej legendarnej krainy."
 )
 user_prompt = (
-    "Podaj tylko nazwę krainy, bez żadnych dodatkowych słów ani znaków."
+    "Podaj polską nazwę tej krainy. Odpowiedz jednym słowem po polsku."
 )
 
 # 5. Konfiguracja klienta LLM z lepszym wykrywaniem modeli
