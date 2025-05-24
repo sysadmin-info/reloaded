@@ -4,7 +4,9 @@
 Zadanie 8: Odczyt nazwy flagi z zaszyfrowanego ciągu i dekodowanie ciągu przy pomocy LLM
 Obsługiwane silniki: openai, lmstudio (Anything LLM), gemini, claude
 DODANO: Obsługę Claude + liczenie tokenów i kosztów dla wszystkich silników (bezpośrednia integracja)
+POPRAWKA: Lepsze wykrywanie silnika z agent.py
 """
+import argparse
 import os
 import re
 import sys
@@ -12,9 +14,43 @@ from dotenv import load_dotenv
 
 load_dotenv(override=True)
 
-# 1. Wczytanie konfiguracji
-ENGINE = os.getenv("LLM_ENGINE", "openai").lower()
-print(f"🔄 Engine: {ENGINE}")
+# POPRAWKA: Dodano argumenty CLI jak w innych zadaniach
+parser = argparse.ArgumentParser(description="Dekodowanie zaszyfrowanego ciągu (multi-engine + Claude)")
+parser.add_argument("--engine", choices=["openai", "lmstudio", "anything", "gemini", "claude"],
+                    help="LLM backend to use")
+args = parser.parse_args()
+
+# POPRAWKA: Lepsze wykrywanie silnika (jak w poprawionych zad1.py-zad7.py)
+ENGINE = None
+if args.engine:
+    ENGINE = args.engine.lower()
+elif os.getenv("LLM_ENGINE"):
+    ENGINE = os.getenv("LLM_ENGINE").lower()
+else:
+    # Próbuj wykryć silnik na podstawie ustawionych zmiennych MODEL_NAME
+    model_name = os.getenv("MODEL_NAME", "")
+    if "claude" in model_name.lower():
+        ENGINE = "claude"
+    elif "gemini" in model_name.lower():
+        ENGINE = "gemini"
+    elif "gpt" in model_name.lower() or "openai" in model_name.lower():
+        ENGINE = "openai"
+    else:
+        # Sprawdź które API keys są dostępne
+        if os.getenv("CLAUDE_API_KEY") or os.getenv("ANTHROPIC_API_KEY"):
+            ENGINE = "claude"
+        elif os.getenv("GEMINI_API_KEY"):
+            ENGINE = "gemini"
+        elif os.getenv("OPENAI_API_KEY"):
+            ENGINE = "openai"
+        else:
+            ENGINE = "lmstudio"  # domyślnie
+
+if ENGINE not in {"openai", "lmstudio", "anything", "gemini", "claude"}:
+    print(f"❌ Nieobsługiwany silnik: {ENGINE}", file=sys.stderr)
+    sys.exit(1)
+
+print(f"🔄 ENGINE wykryty: {ENGINE}")
 
 # 2. Tekst źródłowy
 text = """Nie ma już ludzi, którzy pamiętają, co wydarzyło się w 2024 roku. Możemy tylko przeczytać o tym w książkach lub usłyszeć z opowieści starców, którym to
@@ -62,14 +98,39 @@ user_prompt = (
     "Podaj tylko nazwę krainy, bez żadnych dodatkowych słów ani znaków."
 )
 
-# 5. Konfiguracja klienta LLM
-if ENGINE in {"openai","lmstudio","anything"}:
+# 5. Konfiguracja klienta LLM z lepszym wykrywaniem modeli
+if ENGINE == "openai":
+    OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+    OPENAI_API_URL = os.getenv("OPENAI_API_URL", "https://api.openai.com/v1")
+    MODEL = os.getenv("MODEL_NAME") or os.getenv("MODEL_NAME_OPENAI", "gpt-4o-mini")
+    
+    if not OPENAI_API_KEY:
+        print("❌ Brak OPENAI_API_KEY", file=sys.stderr)
+        sys.exit(1)
+        
     from openai import OpenAI
-    client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"), base_url=os.getenv("OPENAI_API_URL"))
-    MODEL = os.getenv("MODEL_NAME_OPENAI", os.getenv("MODEL_NAME","gpt-4o-mini"))
+    client = OpenAI(api_key=OPENAI_API_KEY, base_url=OPENAI_API_URL)
+
+elif ENGINE == "lmstudio":
+    LMSTUDIO_API_KEY = os.getenv("LMSTUDIO_API_KEY", "local")
+    LMSTUDIO_API_URL = os.getenv("LMSTUDIO_API_URL", "http://localhost:1234/v1")
+    MODEL = os.getenv("MODEL_NAME") or os.getenv("MODEL_NAME_LM", "llama-3.3-70b-instruct")
+    print(f"[DEBUG] LMStudio URL: {LMSTUDIO_API_URL}")
+    print(f"[DEBUG] LMStudio Model: {MODEL}")
+    from openai import OpenAI
+    client = OpenAI(api_key=LMSTUDIO_API_KEY, base_url=LMSTUDIO_API_URL, timeout=60)
+
+elif ENGINE == "anything":
+    ANYTHING_API_KEY = os.getenv("ANYTHING_API_KEY", "local")
+    ANYTHING_API_URL = os.getenv("ANYTHING_API_URL", "http://localhost:1234/v1")
+    MODEL = os.getenv("MODEL_NAME") or os.getenv("MODEL_NAME_ANY", "llama-3.3-70b-instruct")
+    print(f"[DEBUG] Anything URL: {ANYTHING_API_URL}")
+    print(f"[DEBUG] Anything Model: {MODEL}")
+    from openai import OpenAI
+    client = OpenAI(api_key=ANYTHING_API_KEY, base_url=ANYTHING_API_URL, timeout=60)
 
 elif ENGINE == "claude":
-    # Bezpośrednia integracja Claude (jak w zad1.py i zad2.py)
+    # Bezpośrednia integracja Claude
     try:
         from anthropic import Anthropic
     except ImportError:
@@ -81,37 +142,44 @@ elif ENGINE == "claude":
         print("❌ Brak CLAUDE_API_KEY lub ANTHROPIC_API_KEY w .env", file=sys.stderr)
         sys.exit(1)
     
-    MODEL = os.getenv("MODEL_NAME_CLAUDE", "claude-sonnet-4-20250514")
+    MODEL = os.getenv("MODEL_NAME") or os.getenv("MODEL_NAME_CLAUDE", "claude-sonnet-4-20250514")
+    print(f"[DEBUG] Claude Model: {MODEL}")
     claude_client = Anthropic(api_key=CLAUDE_API_KEY)
 
 elif ENGINE == "gemini":
     import google.generativeai as genai
-    genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-    MODEL = os.getenv("MODEL_NAME_GEMINI","gemini-2.5-pro-latest")
-else:
-    print(f"❌ Nieobsługiwany silnik: {ENGINE}", file=sys.stderr)
-    sys.exit(1)
+    GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+    if not GEMINI_API_KEY:
+        print("❌ Brak GEMINI_API_KEY w .env", file=sys.stderr)
+        sys.exit(1)
+    MODEL = os.getenv("MODEL_NAME") or os.getenv("MODEL_NAME_GEMINI", "gemini-2.5-pro-latest")
+    print(f"[DEBUG] Gemini Model: {MODEL}")
+    genai.configure(api_key=GEMINI_API_KEY)
+
+print(f"✅ Zainicjalizowano silnik: {ENGINE} z modelem: {MODEL}")
 
 # 6. Funkcja wywołania LLM
 def call_llm(sys_p, usr_p):
-    if ENGINE in {"openai","lmstudio","anything"}:
+    if ENGINE in {"openai", "lmstudio", "anything"}:
+        print(f"[DEBUG] Wysyłam zapytanie do {ENGINE} z szyfrem")
         resp = client.chat.completions.create(
             model=MODEL,
             messages=[{"role":"system","content":sys_p},{"role":"user","content":usr_p}],
             temperature=0
         )
-        # Liczenie tokenów (jak w zad1.py i zad2.py)
+        # Liczenie tokenów
         tokens = resp.usage
         print(f"[📊 Prompt: {tokens.prompt_tokens} | Completion: {tokens.completion_tokens} | Total: {tokens.total_tokens}]")
         if ENGINE == "openai":
             cost = tokens.prompt_tokens/1_000_000*0.60 + tokens.completion_tokens/1_000_000*2.40
             print(f"[💰 Koszt OpenAI: {cost:.6f} USD]")
         elif ENGINE in {"lmstudio", "anything"}:
-            print(f"[💰 Model lokalny - brak kosztów]")
+            print(f"[💰 Model lokalny ({ENGINE}) - brak kosztów]")
         return resp.choices[0].message.content.strip()
     
     elif ENGINE == "claude":
-        # Claude - bezpośrednia integracja (jak w zad1.py i zad2.py)
+        print(f"[DEBUG] Wysyłam zapytanie do Claude z szyfrem")
+        # Claude - bezpośrednia integracja
         resp = claude_client.messages.create(
             model=MODEL,
             messages=[{"role":"user","content":sys_p + "\n\n" + usr_p}],
@@ -119,39 +187,49 @@ def call_llm(sys_p, usr_p):
             max_tokens=64
         )
         
-        # Liczenie tokenów Claude (jak w zad1.py i zad2.py)
+        # Liczenie tokenów Claude
         usage = resp.usage
-        cost = usage.input_tokens * 0.00003 + usage.output_tokens * 0.00015  # Claude Sonnet 4 pricing
+        cost = usage.input_tokens * 0.00003 + usage.output_tokens * 0.00015
         print(f"[📊 Prompt: {usage.input_tokens} | Completion: {usage.output_tokens} | Total: {usage.input_tokens + usage.output_tokens}]")
         print(f"[💰 Koszt Claude: {cost:.6f} USD]")
         
         return resp.content[0].text.strip()
     
-    else:
+    elif ENGINE == "gemini":
+        print(f"[DEBUG] Wysyłam zapytanie do Gemini z szyfrem")
         model_llm = genai.GenerativeModel(MODEL)
         resp = model_llm.generate_content([sys_p, usr_p], generation_config={"temperature":0.0,"max_output_tokens":64})
         print(f"[📊 Gemini - brak szczegółów tokenów]")
         print(f"[💰 Gemini - sprawdź limity w Google AI Studio]")
         return resp.text.strip()
 
-# 7. Odczyt odpowiedzi i ekstrakcja flagi — obsługa <think>…</think>
-raw_name = call_llm(system_prompt, user_prompt)
+# 7. Main logic
+def main():
+    print(f"🚀 Używam silnika: {ENGINE}")
+    print(f"🔍 Dekodoruję szyfr book-cipher...")
+    
+    # Odczyt odpowiedzi i ekstrakcja flagi — obsługa <think>…</think>
+    raw_name = call_llm(system_prompt, user_prompt)
+    print(f"🤖 Odpowiedź modelu: {raw_name}")
 
-# Jeśli jest blok <think>, wyciągnij tylko to, co po ostatnim </think>
-if "</think>" in raw_name.lower():
-    # Pracuj na lowercase, ale zachowaj oryginalny tekst po tagu
-    # rsplit na oryginale, nie na lower(), żeby nie tracić polskich znaków itp.
-    raw_name = raw_name.rsplit("</think>", 1)[-1].strip()
+    # Jeśli jest blok <think>, wyciągnij tylko to, co po ostatnim </think>
+    if "</think>" in raw_name.lower():
+        # Pracuj na lowercase, ale zachowaj oryginalny tekst po tagu
+        # rsplit na oryginale, nie na lower(), żeby nie tracić polskich znaków itp.
+        raw_name = raw_name.rsplit("</think>", 1)[-1].strip()
 
-# Usuń wszystkie niepotrzebne białe znaki
-raw_name = raw_name.strip()
+    # Usuń wszystkie niepotrzebne białe znaki
+    raw_name = raw_name.strip()
 
-# Szukaj pierwszego słowa z polskim alfabetem po tagu (jeśli nie ma, zwróć całość)
-match = re.search(r"[A-Za-zĄąĆćĘęŁłŃńÓóŚśŹźŻż]+", raw_name)
-if match:
-    name = match.group(0).capitalize()
-else:
-    name = raw_name.strip()
+    # Szukaj pierwszego słowa z polskim alfabetem po tagu (jeśli nie ma, zwróć całość)
+    match = re.search(r"[A-Za-zĄąĆćĘęŁłŃńÓóŚśŹźŻż]+", raw_name)
+    if match:
+        name = match.group(0).capitalize()
+    else:
+        name = raw_name.strip()
 
-flag = f"FLG{{{name}}}"
-print(flag)
+    flag = f"FLG{{{name}}}"
+    print(f"🏁 Znaleziona flaga: {flag}")
+
+if __name__ == "__main__":
+    main()
