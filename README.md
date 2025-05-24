@@ -1,4 +1,4 @@
-# reloaded
+# AI Devs 3 Reloaded - zadania w Python. Orkiestrator: LangGraph.
 
 ### English version below.
 
