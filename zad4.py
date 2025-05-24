@@ -3,7 +3,8 @@
 zad4.py - Cenzura danych agentów przez LLM
 Cenzuruje imię i nazwisko, wiek, miasto oraz ulicę+numer,
 zastępując je słowem "CENZURA" wyłącznie przez LLM.
-Obsługa: openai, lmstudio, anything, gemini (Google).
+Obsługa: openai, lmstudio, anything, gemini, claude.
+DODANO: Obsługę Claude + liczenie tokenów i kosztów dla wszystkich silników (bezpośrednia integracja)
 """
 
 import os
@@ -11,9 +12,20 @@ import sys
 import requests
 from dotenv import load_dotenv
 
+load_dotenv(override=True)
+
 CENTRALA_API_KEY = os.getenv("CENTRALA_API_KEY")
 REPORT_URL = os.getenv("REPORT_URL")
 ENGINE = os.getenv("LLM_ENGINE", "openai").lower()
+
+# Sprawdzenie czy silnik jest obsługiwany
+if ENGINE not in {"openai", "lmstudio", "anything", "gemini", "claude"}:
+    print(f"❌ Nieobsługiwany silnik: {ENGINE}", file=sys.stderr)
+    sys.exit(1)
+
+print(f"🔄 Engine: {ENGINE}")
+
+# Modele i klucze API
 MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4o-mini")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 OPENAI_API_URL = os.getenv("OPENAI_API_URL", "")
@@ -61,6 +73,7 @@ def censor_llm(text: str) -> str:
         "Tekst do cenzury (nie zmieniaj nic poza danymi osobowymi, przykład wyżej!):\n"
         + text
     )
+    
     # --- OpenAI ---
     if ENGINE == "openai":
         try:
@@ -70,14 +83,55 @@ def censor_llm(text: str) -> str:
             sys.exit(1)
         client = OpenAI(api_key=OPENAI_API_KEY, base_url=OPENAI_API_URL)
         resp = client.chat.completions.create(
-            model=MODEL_NAME,
+            model=os.getenv("MODEL_NAME_OPENAI", "gpt-4o-mini"),  # POPRAWKA: użyj modelu OpenAI
             messages=[
                 {"role": "system", "content": PROMPT_SYSTEM},
                 {"role": "user", "content": prompt_user}
             ],
             temperature=0
         )
+        # Liczenie tokenów (jak w zad1.py i zad2.py)
+        tokens = resp.usage
+        cost = tokens.prompt_tokens/1_000_000*0.60 + tokens.completion_tokens/1_000_000*2.40
+        print(f"[📊 Prompt: {tokens.prompt_tokens} | Completion: {tokens.completion_tokens} | Total: {tokens.total_tokens}]")
+        print(f"[💰 Koszt OpenAI: {cost:.6f} USD]")
         return resp.choices[0].message.content.strip()
+    
+    # --- Claude ---
+    elif ENGINE == "claude":
+        # Bezpośrednia integracja Claude (jak w zad1.py i zad2.py)
+        try:
+            from anthropic import Anthropic
+        except ImportError:
+            print("❌ Musisz zainstalować anthropic: pip install anthropic", file=sys.stderr)
+            sys.exit(1)
+        
+        CLAUDE_API_KEY = os.getenv("CLAUDE_API_KEY") or os.getenv("ANTHROPIC_API_KEY")
+        if not CLAUDE_API_KEY:
+            print("❌ Brak CLAUDE_API_KEY lub ANTHROPIC_API_KEY w .env", file=sys.stderr)
+            sys.exit(1)
+        
+        model_claude = os.getenv("MODEL_NAME_CLAUDE", "claude-sonnet-4-20250514")
+        claude_client = Anthropic(api_key=CLAUDE_API_KEY)
+        
+        resp = claude_client.messages.create(
+            model=model_claude,
+            messages=[
+                {"role": "user", "content": PROMPT_SYSTEM + "\n\n" + prompt_user}
+            ],
+            system=None,  # system w content
+            temperature=0,
+            max_tokens=4000
+        )
+        
+        # Liczenie tokenów Claude (jak w zad1.py i zad2.py)
+        usage = resp.usage
+        cost = usage.input_tokens * 0.00003 + usage.output_tokens * 0.00015  # Claude Sonnet 4 pricing
+        print(f"[📊 Prompt: {usage.input_tokens} | Completion: {usage.output_tokens} | Total: {usage.input_tokens + usage.output_tokens}]")
+        print(f"[💰 Koszt Claude: {cost:.6f} USD]")
+        
+        return resp.content[0].text.strip()
+    
     # --- Gemini (Google) ---
     elif ENGINE == "gemini":
         try:
@@ -91,7 +145,10 @@ def censor_llm(text: str) -> str:
             [PROMPT_SYSTEM + "\n" + prompt_user],
             generation_config={"temperature": 0.0, "max_output_tokens": 4096}
         )
+        print(f"[📊 Gemini - brak szczegółów tokenów]")
+        print(f"[💰 Gemini - sprawdź limity w Google AI Studio]")
         return response.text.strip()
+    
     # --- LM Studio / Anything LLM (OpenAI compatible, local) ---
     elif ENGINE in {"lmstudio", "anything"}:
         try:
@@ -110,6 +167,10 @@ def censor_llm(text: str) -> str:
             ],
             temperature=0
         )
+        # Liczenie tokenów (jak w zad1.py i zad2.py)
+        tokens = resp.usage
+        print(f"[📊 Prompt: {tokens.prompt_tokens} | Completion: {tokens.completion_tokens} | Total: {tokens.total_tokens}]")
+        print(f"[💰 Model lokalny - brak kosztów]")
         return resp.choices[0].message.content.strip()
     else:
         print(f"❌ Nieznany silnik: {ENGINE}", file=sys.stderr)

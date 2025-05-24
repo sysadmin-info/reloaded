@@ -1,3 +1,9 @@
+#!/usr/bin/env python3
+"""
+zad5.py - Analiza nagrań audio z przesłuchań
+Obsługuje: openai, lmstudio, anything, gemini, claude
+DODANO: Obsługę Claude z bezpośrednią integracją (jak zad1.py i zad2.py)
+"""
 import os
 import zipfile
 import requests
@@ -8,6 +14,8 @@ from dotenv import load_dotenv
 # Konfiguracja i helpery
 load_dotenv()
 ENGINE = os.getenv("LLM_ENGINE", "openai").lower()
+
+print(f"🔄 Engine: {ENGINE}")
 
 DATA_URL       = os.getenv("DATA_URL")
 REPORT_URL     = os.getenv("REPORT_URL")
@@ -38,6 +46,22 @@ elif ENGINE == "anything":
     MODEL_NAME = os.getenv("MODEL_NAME_ANY", os.getenv("MODEL_NAME", "llama-3.3-70b-instruct"))
     from openai import OpenAI
     client = OpenAI(api_key=ANYTHING_API_KEY, base_url=ANYTHING_API_URL)
+
+elif ENGINE == "claude":
+    # Bezpośrednia integracja Claude (jak w zad1.py i zad2.py)
+    try:
+        from anthropic import Anthropic
+    except ImportError:
+        print("❌ Musisz zainstalować anthropic: pip install anthropic", file=sys.stderr)
+        sys.exit(1)
+    
+    CLAUDE_API_KEY = os.getenv("CLAUDE_API_KEY") or os.getenv("ANTHROPIC_API_KEY")
+    if not CLAUDE_API_KEY:
+        print("❌ Brak CLAUDE_API_KEY lub ANTHROPIC_API_KEY w .env", file=sys.stderr)
+        sys.exit(1)
+    
+    MODEL_NAME = os.getenv("MODEL_NAME_CLAUDE", "claude-sonnet-4-20250514")
+    claude_client = Anthropic(api_key=CLAUDE_API_KEY)
 
 elif ENGINE == "gemini":
     import google.generativeai as genai
@@ -79,6 +103,9 @@ def get_transcript(audio_path: Path) -> str:
     if ENGINE == "gemini":
         print("❌ Transkrypcja audio (Whisper) działa tylko przez OpenAI API.")
         exit(1)
+    if ENGINE == "claude":
+        print("❌ Transkrypcja audio (Whisper) wymaga OpenAI API - Claude nie obsługuje audio.")
+        exit(1)
     print(f"   > Transkrypcja z chmury dla: {audio_path.name}")
     with open(audio_path, 'rb') as f:
         resp = client.audio.transcriptions.create(
@@ -91,7 +118,7 @@ def get_transcript(audio_path: Path) -> str:
     txt_path.write_text(text, encoding='utf-8')
     return text
 
-def infer_answer(client_or_model, model_name: str, fragments: str) -> str:
+def infer_answer(fragments: str) -> str:
     system_msg = (
         "Jesteś śledczym-logiki."
         "Otrzymasz dwa fragmenty zeznań dotyczące przedmiotu i miejsca wykładów."
@@ -103,9 +130,10 @@ def infer_answer(client_or_model, model_name: str, fragments: str) -> str:
         "Wydział: <pełna nazwa>Ulica: <ulica i numer>"
     )
     user_msg = f"Fragmenty zeznań:{fragments}"
+    
     if ENGINE in {"openai", "lmstudio", "anything"}:
-        resp = client_or_model.chat.completions.create(
-            model=model_name,
+        resp = client.chat.completions.create(
+            model=MODEL_NAME,
             messages=[
                 {"role": "system", "content": system_msg},
                 {"role": "user",   "content": user_msg},
@@ -113,17 +141,43 @@ def infer_answer(client_or_model, model_name: str, fragments: str) -> str:
             temperature=0
         )
         answer = resp.choices[0].message.content.strip()
+        
+        # Liczenie tokenów (jak w zad1.py i zad2.py)
         tokens = resp.usage
         print(f"[📊 Prompt: {tokens.prompt_tokens} | Completion: {tokens.completion_tokens} | Total: {tokens.total_tokens}]")
         if ENGINE == "openai":
             cost = tokens.prompt_tokens/1_000_000*0.60 + tokens.completion_tokens/1_000_000*2.40
             print(f"[💰 Koszt OpenAI: {cost:.6f} USD]")
+        elif ENGINE in {"lmstudio", "anything"}:
+            print(f"[💰 Model lokalny - brak kosztów]")
         return answer
+    
+    elif ENGINE == "claude":
+        # Claude - bezpośrednia integracja (jak w zad1.py i zad2.py)
+        resp = claude_client.messages.create(
+            model=MODEL_NAME,
+            messages=[
+                {"role": "user", "content": system_msg + "\n\n" + user_msg}
+            ],
+            temperature=0,
+            max_tokens=4000
+        )
+        
+        # Liczenie tokenów Claude (jak w zad1.py i zad2.py)
+        usage = resp.usage
+        cost = usage.input_tokens * 0.00003 + usage.output_tokens * 0.00015  # Claude Sonnet 4 pricing
+        print(f"[📊 Prompt: {usage.input_tokens} | Completion: {usage.output_tokens} | Total: {usage.input_tokens + usage.output_tokens}]")
+        print(f"[💰 Koszt Claude: {cost:.6f} USD]")
+        
+        return resp.content[0].text.strip()
+    
     elif ENGINE == "gemini":
         response = model_gemini.generate_content(
             [system_msg, user_msg],
             generation_config={"temperature": 0.0, "max_output_tokens": 512}
         )
+        print(f"[📊 Gemini - brak szczegółów tokenów]")
+        print(f"[💰 Gemini - sprawdź limity w Google AI Studio]")
         return response.text.strip()
 
 def main():
@@ -165,7 +219,7 @@ def main():
     fragments = "\n".join(fragments)
     # 4. Wnioskowanie
     print("3/4 Wnioskuję z pomocą LLM...")
-    answer = infer_answer(client if ENGINE != "gemini" else model_gemini, MODEL_NAME if ENGINE != "gemini" else MODEL_NAME_GEMINI, fragments)
+    answer = infer_answer(fragments)
     print(f"Odpowiedź:\n{answer}")
     # 5. Wysłanie raportu
     payload = {"task": "mp3", "apikey": CENTRALA_KEY, "answer": answer}

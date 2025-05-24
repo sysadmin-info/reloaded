@@ -19,14 +19,14 @@ completed_tasks = set()
 
 def _execute_task(task_key: str):
     key = str(task_key).strip().strip("'").strip('"')
-    if key not in {"1", "2", "3", "4", "5", "6", "7", "8", "9"}:
-        return ("Niepoprawny numer zadania. Wybierz w zakresie 1-9.", False, False)
+    if key not in {"1", "2", "3", "4", "5", "6", "7", "8", "9", "10"}:
+        return ("Niepoprawny numer zadania. Wybierz w zakresie 1-10.", False, False)
     script = f"zad{key}.py"
     if not os.path.exists(script):
         return (f"Plik {script} nie istnieje.", False, False)
     env = os.environ.copy()
     if not env.get("MODEL_NAME"):
-        env["MODEL_NAME"] = env.get("MODEL_NAME_LM") or env.get("MODEL_NAME_ANY") or env.get("MODEL_NAME_GEMINI") or env.get("MODEL_NAME_OPENAI") or ""
+        env["MODEL_NAME"] = env.get("MODEL_NAME_LM") or env.get("MODEL_NAME_ANY") or env.get("MODEL_NAME_GEMINI") or env.get("MODEL_NAME_OPENAI") or env.get("MODEL_NAME_CLAUDE") or ""
     if not env.get("OPENAI_API_KEY"):
         env["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY", "")
     env["PYTHONUTF8"] = "1"
@@ -64,6 +64,7 @@ def run_task(task_key: str) -> str:
     """
     Uruchamia zadanie zadN.py (gdzie N to numer zadania) i zwraca wynik działania,
     w szczególności flagę w formacie {{FLG:...}}. Używany przez agenta LangChain.
+    Obsługuje zadania 1-10.
     """
     key = str(task_key).strip().strip("'").strip('"')
     print(f"🔄 Uruchamiam zadanie {key}…")
@@ -128,18 +129,25 @@ def _append_to_json_log(entry: dict):
 
 def main():
     engine = ""
-    while engine not in {"openai", "lmstudio", "anything", "gemini"}:
+    # DODANO: claude do wyboru silników
+    while engine not in {"openai", "lmstudio", "anything", "gemini", "claude"}:
         try:
-            engine = input("Wybierz silnik LLM [openai/lmstudio/anything/gemini]: ").strip().lower()
+            engine = input("Wybierz silnik LLM [openai/lmstudio/anything/gemini/claude]: ").strip().lower()
         except (EOFError, KeyboardInterrupt):
             print("\nKoniec.")
             return
-        if engine not in {"openai", "lmstudio", "anything", "gemini"}:
-            print("⚠️ Nieznany wybór. Wpisz 'openai', 'lmstudio', 'anything' albo 'gemini'.")
+        if engine not in {"openai", "lmstudio", "anything", "gemini", "claude"}:
+            print("⚠️ Nieznany wybór. Wpisz 'openai', 'lmstudio', 'anything', 'gemini' albo 'claude'.")
 
     if engine == "openai":
         os.environ["LLM_ENGINE"] = "openai"
         os.environ["OPENAI_API_URL"] = "https://api.openai.com/v1"
+    elif engine == "claude":
+        # DODANO: obsługa Claude
+        os.environ["LLM_ENGINE"] = "claude"
+        if not os.getenv("CLAUDE_API_KEY") and not os.getenv("ANTHROPIC_API_KEY"):
+            print("⚠️ Nie ustawiono CLAUDE_API_KEY ani ANTHROPIC_API_KEY w .env - przerwano działanie.")
+            return
     elif engine == "gemini":
         os.environ["LLM_ENGINE"] = "gemini"
         if not os.getenv("GEMINI_API_KEY"):
@@ -156,6 +164,9 @@ def main():
         if not model_name:
             print("⚠️ Nie ustawiono MODEL_NAME_OPENAI w .env - przerwano działanie.")
             return
+    elif engine == "claude":
+        # DODANO: model dla Claude
+        model_name = os.getenv("MODEL_NAME_CLAUDE", "claude-sonnet-4-20250514")
     elif engine == "lmstudio":
         model_name = os.getenv("MODEL_NAME_LM", "")
         if not model_name:
@@ -172,7 +183,23 @@ def main():
             model_name = os.getenv("MODEL_NAME_OPENAI", "gpt-4o-mini")
     os.environ["MODEL_NAME"] = model_name
 
-    if engine == "gemini":
+    # DODANO: inicjalizacja LLM dla Claude
+    if engine == "claude":
+        # Claude nie jest bezpośrednio obsługiwany przez LangChain w tej wersji
+        # Używamy ChatOpenAI z custom base_url (jeśli masz proxy Claude->OpenAI)
+        # Alternatywnie możemy użyć ChatAnthropic jeśli dostępne
+        try:
+            from langchain_anthropic import ChatAnthropic
+            llm = ChatAnthropic(
+                model_name=model_name,
+                anthropic_api_key=os.getenv("CLAUDE_API_KEY") or os.getenv("ANTHROPIC_API_KEY"),
+                temperature=0
+            )
+        except ImportError:
+            print("⚠️ Brak langchain_anthropic. Zainstaluj: pip install langchain-anthropic")
+            print("Lub użyj innego silnika.")
+            return
+    elif engine == "gemini":
         llm = ChatGoogleGenerativeAI(
             model=model_name,
             google_api_key=os.getenv("GEMINI_API_KEY"),
@@ -195,7 +222,7 @@ def main():
     builder.add_conditional_edges("agent", tools_condition, {"tools": "tools", END: END})
     builder.add_edge("tools", "agent")
     graph = builder.compile()
-    print("Agent uruchomiony. Komendy: run_task N | read_env VAR | exit")
+    print("Agent uruchomiony. Komendy: run_task N (1-10) | read_env VAR | exit")
     while True:
         try:
             cmd = input("> ").strip()
@@ -210,13 +237,13 @@ def main():
         if cmd.lower().startswith("run_task"):
             parts = cmd.split(maxsplit=1)
             if len(parts) < 2:
-                print("Niepoprawny numer zadania. Wybierz w zakresie 1-9.")
+                print("Niepoprawny numer zadania. Wybierz w zakresie 1-10.")
                 continue
             task_arg = parts[1].strip()
             if (task_arg.startswith("'") and task_arg.endswith("'")) or (task_arg.startswith('"') and task_arg.endswith('"')):
                 task_arg = task_arg[1:-1].strip()
-            if task_arg not in {"1", "2", "3", "4", "5", "6", "7", "8", "9"}:
-                print("Niepoprawny numer zadania. Wybierz w zakresie 1-9.")
+            if task_arg not in {"1", "2", "3", "4", "5", "6", "7", "8", "9", "10"}:
+                print("Niepoprawny numer zadania. Wybierz w zakresie 1-10.")
                 continue
             task_id = task_arg
             print(f"🔄 Uruchamiam zadanie {task_id}…")
@@ -260,7 +287,7 @@ def main():
             value = os.getenv(var, "(niewartość)")
             print(value)
             continue
-        print("Nieznana komenda. Użyj: run_task N, read_env VAR, lub exit.")
+        print("Nieznana komenda. Użyj: run_task N (1-10), read_env VAR, lub exit.")
 
 if __name__ == "__main__":
     main()

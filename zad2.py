@@ -1,28 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-bot_multi.py  (multi-engine)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+bot_multi.py  (multi-engine + Claude)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 • zgodny z openai-python ≥ 1.0
-• obsługuje backendy: openai / lmstudio / anything (LocalAI) / gemini (Google)
-• nadal celowo „kłamie” (Kraków, 69, 1999, blue) - logika oryginału zachowana.
-
-Uruchomienie
-------------
-# OpenAI (domyślnie)
-python bot_multi.py --engine openai
-
-# LM Studio (port 1234)
-$Env:OPENAI_API_KEY = "local"
-python bot_multi.py --engine lmstudio
-
-# LocalAI / Anything LLM (port 1234, model mistral.gguf)
-$Env:OPENAI_API_KEY = "local"
-$Env:MODEL_NAME     = "mistral.gguf"
-python bot_multi.py --engine anything
-
-# Gemini (Google, klucz w GEMINI_API_KEY)
-python bot_multi.py --engine gemini
+• obsługuje backendy: openai / lmstudio / anything (LocalAI) / gemini (Google) / claude (Anthropic)
+• nadal celowo „kłamie" (Kraków, 69, 1999, blue) - logika oryginału zachowana.
+DODANO: Obsługę Claude z kompatybilnym interfejsem
 """
 
 from __future__ import annotations
@@ -40,12 +24,20 @@ import urllib3
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 
+# Import Claude integration
+try:
+    from claude_integration import setup_claude_for_task, add_token_counting_to_openai_call
+except ImportError:
+    print("❌ Brak claude_integration.py - skopiuj plik z artefaktu")
+    # Kontynuujemy bez Claude
+    pass
+
 # ── 0. CLI / env - wybór silnika ─────────────────────────────────────────────
 load_dotenv(override=True)
 
-parser = argparse.ArgumentParser(description="Android bot (multi-engine)")
+parser = argparse.ArgumentParser(description="Android bot (multi-engine + Claude)")
 parser.add_argument("--engine",
-                    choices=["openai", "lmstudio", "anything", "gemini"],
+                    choices=["openai", "lmstudio", "anything", "gemini", "claude"],
                     help="LLM backend to use")
 args = parser.parse_args()
 
@@ -120,6 +112,15 @@ elif ENGINE == "anything":
     from openai import OpenAI
     client = OpenAI(api_key=ANYTHING_API_KEY, base_url=ANYTHING_API_URL)
 
+elif ENGINE == "claude":
+    # Inicjalizacja Claude
+    try:
+        claude_client, MODEL_NAME = setup_claude_for_task(ENGINE)
+        client = claude_client
+    except:
+        print("❌ Błąd inicjalizacji Claude - sprawdź claude_integration.py i CLAUDE_API_KEY", file=sys.stderr)
+        sys.exit(1)
+
 elif ENGINE == "gemini":
     import google.generativeai as genai
     GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
@@ -148,12 +149,16 @@ def answer_with_llm(question: str) -> str:
                 temperature=0,
             )
             answer = rsp.choices[0].message.content.strip()
+            
+            # Liczenie tokenów (już było w oryginalnym kodzie)
             tokens = rsp.usage
             print(f"[📊 Prompt: {tokens.prompt_tokens} | Completion: {tokens.completion_tokens} | Total: {tokens.total_tokens}]")
             if ENGINE == "openai":
                 cost = tokens.prompt_tokens/1_000_000*0.60 + tokens.completion_tokens/1_000_000*2.40
                 print(f"[💰 Koszt OpenAI: {cost:.6f} USD]")
-                return answer
+            elif ENGINE in {"lmstudio", "anything"}:
+                print(f"[💰 Model lokalny - brak kosztów]")
+            return answer
         except Exception as e:
             print("[!] LLM error:", e, file=sys.stderr)
             return {
@@ -161,11 +166,34 @@ def answer_with_llm(question: str) -> str:
                 "fr": "Je ne sais pas",
                 "en": "I don't know",
             }[lang]
+    
+    elif ENGINE == "claude":
+        try:
+            rsp = client.chat_completions_create(
+                model=MODEL_NAME,
+                messages=[
+                    {"role": "system", "content": SYSTEM_PROMPTS[lang]},
+                    {"role": "user",   "content": question},
+                ],
+                max_tokens=10,
+                temperature=0,
+            )
+            return rsp.choices[0].message.content.strip()
+        except Exception as e:
+            print("[!] Claude error:", e, file=sys.stderr)
+            return {
+                "pl": "Nie wiem",
+                "fr": "Je ne sais pas", 
+                "en": "I don't know",
+            }[lang]
+    
     elif ENGINE == "gemini":
         response = model_gemini.generate_content(
             [SYSTEM_PROMPTS[lang], question],
             generation_config={"temperature": 0.0, "max_output_tokens": 10}
         )
+        print(f"[📊 Gemini - brak szczegółów tokenów]")
+        print(f"[💰 Gemini - sprawdź limity w Google AI Studio]")
         return response.text.strip()
 
 def decide_answer(question: str) -> str:

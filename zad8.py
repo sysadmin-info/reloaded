@@ -2,15 +2,19 @@
 # -*- coding: utf-8 -*-
 """
 Zadanie 8: Odczyt nazwy flagi z zaszyfrowanego ciągu i dekodowanie ciągu przy pomocy LLM
-Obsługiwane silniki: openai, lmstudio (Anything LLM), gemini
+Obsługiwane silniki: openai, lmstudio (Anything LLM), gemini, claude
+DODANO: Obsługę Claude + liczenie tokenów i kosztów dla wszystkich silników (bezpośrednia integracja)
 """
 import os
 import re
 import sys
 from dotenv import load_dotenv
 
+load_dotenv(override=True)
+
 # 1. Wczytanie konfiguracji
 ENGINE = os.getenv("LLM_ENGINE", "openai").lower()
+print(f"🔄 Engine: {ENGINE}")
 
 # 2. Tekst źródłowy
 text = """Nie ma już ludzi, którzy pamiętają, co wydarzyło się w 2024 roku. Możemy tylko przeczytać o tym w książkach lub usłyszeć z opowieści starców, którym to
@@ -63,6 +67,23 @@ if ENGINE in {"openai","lmstudio","anything"}:
     from openai import OpenAI
     client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"), base_url=os.getenv("OPENAI_API_URL"))
     MODEL = os.getenv("MODEL_NAME_OPENAI", os.getenv("MODEL_NAME","gpt-4o-mini"))
+
+elif ENGINE == "claude":
+    # Bezpośrednia integracja Claude (jak w zad1.py i zad2.py)
+    try:
+        from anthropic import Anthropic
+    except ImportError:
+        print("❌ Musisz zainstalować anthropic: pip install anthropic", file=sys.stderr)
+        sys.exit(1)
+    
+    CLAUDE_API_KEY = os.getenv("CLAUDE_API_KEY") or os.getenv("ANTHROPIC_API_KEY")
+    if not CLAUDE_API_KEY:
+        print("❌ Brak CLAUDE_API_KEY lub ANTHROPIC_API_KEY w .env", file=sys.stderr)
+        sys.exit(1)
+    
+    MODEL = os.getenv("MODEL_NAME_CLAUDE", "claude-sonnet-4-20250514")
+    claude_client = Anthropic(api_key=CLAUDE_API_KEY)
+
 elif ENGINE == "gemini":
     import google.generativeai as genai
     genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
@@ -79,10 +100,38 @@ def call_llm(sys_p, usr_p):
             messages=[{"role":"system","content":sys_p},{"role":"user","content":usr_p}],
             temperature=0
         )
+        # Liczenie tokenów (jak w zad1.py i zad2.py)
+        tokens = resp.usage
+        print(f"[📊 Prompt: {tokens.prompt_tokens} | Completion: {tokens.completion_tokens} | Total: {tokens.total_tokens}]")
+        if ENGINE == "openai":
+            cost = tokens.prompt_tokens/1_000_000*0.60 + tokens.completion_tokens/1_000_000*2.40
+            print(f"[💰 Koszt OpenAI: {cost:.6f} USD]")
+        elif ENGINE in {"lmstudio", "anything"}:
+            print(f"[💰 Model lokalny - brak kosztów]")
         return resp.choices[0].message.content.strip()
+    
+    elif ENGINE == "claude":
+        # Claude - bezpośrednia integracja (jak w zad1.py i zad2.py)
+        resp = claude_client.messages.create(
+            model=MODEL,
+            messages=[{"role":"user","content":sys_p + "\n\n" + usr_p}],
+            temperature=0,
+            max_tokens=64
+        )
+        
+        # Liczenie tokenów Claude (jak w zad1.py i zad2.py)
+        usage = resp.usage
+        cost = usage.input_tokens * 0.00003 + usage.output_tokens * 0.00015  # Claude Sonnet 4 pricing
+        print(f"[📊 Prompt: {usage.input_tokens} | Completion: {usage.output_tokens} | Total: {usage.input_tokens + usage.output_tokens}]")
+        print(f"[💰 Koszt Claude: {cost:.6f} USD]")
+        
+        return resp.content[0].text.strip()
+    
     else:
         model_llm = genai.GenerativeModel(MODEL)
         resp = model_llm.generate_content([sys_p, usr_p], generation_config={"temperature":0.0,"max_output_tokens":64})
+        print(f"[📊 Gemini - brak szczegółów tokenów]")
+        print(f"[💰 Gemini - sprawdź limity w Google AI Studio]")
         return resp.text.strip()
 
 # 7. Odczyt odpowiedzi i ekstrakcja flagi — obsługa <think>…</think>

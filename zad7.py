@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-zad7.py - Multi-engine obraz robota: OpenAI (DALL-E), LM Studio, Anything, Gemini (brak wsparcia), ComfyUI
+zad7.py - Multi-engine obraz robota: OpenAI (DALL-E), LM Studio, Anything, Gemini (brak wsparcia), Claude (brak wsparcia), ComfyUI
 
 - LM Studio i Anything uruchamiają generowanie przez lokalny backend ComfyUI
 - Dla ComfyUI wymagany workflow w formacie API (Save (API Format) w UI)
 - Prompt pobierany dynamicznie z Centrali
+- Claude NIE OBSŁUGUJE generowania obrazów - dodano komunikat informacyjny
+- BEZPOŚREDNIA INTEGRACJA Claude (jak zad1.py i zad2.py)
 
 Wymagane zmienne środowiskowe (w .env):
 - OPENAI_API_KEY, OPENAI_API_URL (opcjonalnie), MODEL_NAME_IMAGE
@@ -110,8 +112,8 @@ def check_comfyui_api(url):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Generowanie obrazu robota (openai/lmstudio/anything/gemini/comfyui)")
-    parser.add_argument("--engine", choices=["openai", "lmstudio", "anything", "gemini", "comfyui"],
+    parser = argparse.ArgumentParser(description="Generowanie obrazu robota (openai/lmstudio/anything/gemini/claude/comfyui)")
+    parser.add_argument("--engine", choices=["openai", "lmstudio", "anything", "gemini", "claude", "comfyui"],
                         help="Backend LLM do użycia")
     parser.add_argument("--workflow", default="robot.json",
                         help="Ścieżka do pliku workflow ComfyUI (API format)")
@@ -121,6 +123,8 @@ def main():
 
     ENGINE = (args.engine or os.getenv("LLM_ENGINE", "openai")).lower()
     WORKFLOW = args.workflow
+
+    print(f"🔄 Engine: {ENGINE}")
 
     # Ustal OUTPUT_DIR dynamicznie jeśli nie podano
     if args.output_dir:
@@ -138,7 +142,7 @@ def main():
     GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
     REPORT_URL = os.getenv("REPORT_URL", "")
     CENTRALA_API_KEY = os.getenv("CENTRALA_API_KEY", "")
-    LOCAL_SD_API_URL = os.getenv("LOCAL_SD_API_URL", "http://localhost:8000")
+    LOCAL_SD_API_URL = os.getenv("LOCAL_SD_API_URL", "http://localhost:8074")
     MODEL_NAME_IMAGE = os.getenv("MODEL_NAME_IMAGE", "dall-e-3")
 
     if not CENTRALA_API_KEY or not REPORT_URL:
@@ -189,14 +193,31 @@ def main():
                 size="1024x1024"
             )
             image_url = resp_img.data[0].url
+            print(f"[📊 DALL-E - brak szczegółów tokenów]")
+            print(f"[💰 DALL-E - sprawdź koszty w OpenAI Dashboard]")
         except Exception as e:
             print(f"❌ Błąd generowania obrazu przez OpenAI: {e}", file=sys.stderr)
             sys.exit(1)
     elif ENGINE in {"lmstudio", "anything", "comfyui"}:
         print(banner("Generowanie obrazu (ComfyUI API)"))
         image_url = generate_with_comfyui(prompt, WORKFLOW, LOCAL_SD_API_URL, OUTPUT_DIR)
+        print(f"[📊 ComfyUI - model lokalny]")
+        print(f"[💰 ComfyUI - brak kosztów]")
+    elif ENGINE == "claude":
+        # Bezpośrednia integracja Claude (jak w zad1.py i zad2.py)
+        print(banner("❌ Claude (Anthropic) nie obsługuje generowania obrazów!"))
+        print("Claude jest modelem tekstowym i nie może generować obrazów.")
+        print("Dostępne opcje:")
+        print("1. Użyj OpenAI (DALL-E): ustaw LLM_ENGINE=openai w .env")
+        print("2. Użyj ComfyUI (local): ustaw LLM_ENGINE=comfyui w .env")
+        print("3. Uruchom ponownie agent.py i wybierz inny silnik")
+        print("\nClaude świetnie sprawdza się w zadaniach tekstowych i analizy obrazów (vision),")
+        print("ale nie może tworzyć nowych obrazów.")
+        sys.exit(2)
     elif ENGINE == "gemini":
         print(banner("❌ Gemini (Google Generative AI) nie obsługuje generowania obrazów!"))
+        print("Gemini w obecnej wersji nie obsługuje generowania obrazów.")
+        print("Użyj OpenAI (DALL-E) lub ComfyUI (local)")
         sys.exit(2)
     else:
         print(f"❌ Nieobsługiwany silnik: {ENGINE}", file=sys.stderr)
