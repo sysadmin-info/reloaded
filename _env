@@ -29,7 +29,7 @@ WHISPER_MODEL=base
 ############################################################ Alphabet / Gemini ############################################################
 
 # Gemini / Google API
-GEMINI_API_KEY=twój_klucz_claude_tutaj
+GEMINI_API_KEY=twój_klucz_gemini_tutaj
 MODEL_NAME_GEMINI=gemini-1.5-pro-latest
 MODEL_NAME_GEMINI_IMAGE=gemini-2.0-flash
 
