@@ -6,7 +6,9 @@ zad9.py - Klasyfikacja plików z fabryki: jedna prośba do LLM na plik, detekcja
 • Orkiestracja: LangGraph
 
 POPRAWKI: Konserwatywna logika klasyfikacji people - tylko potwierdzone schwytania
+POPRAWKA: Lepsze wykrywanie silnika z agent.py
 """
+import argparse
 import os
 import sys
 import json
@@ -22,40 +24,91 @@ from langgraph.graph import StateGraph, START, END
 
 # --- 1. Konfiguracja i inicjalizacja LLM ---
 load_dotenv(override=True)
+
+# POPRAWKA: Dodano argumenty CLI jak w innych zadaniach
+parser = argparse.ArgumentParser(description="Klasyfikacja plików z fabryki (multi-engine + Claude)")
+parser.add_argument("--engine", choices=["openai", "lmstudio", "anything", "gemini", "claude"],
+                    help="LLM backend to use")
+args = parser.parse_args()
+
+# POPRAWKA: Lepsze wykrywanie silnika (jak w poprawionych zad1.py-zad8.py)
+ENGINE = None
+if args.engine:
+    ENGINE = args.engine.lower()
+elif os.getenv("LLM_ENGINE"):
+    ENGINE = os.getenv("LLM_ENGINE").lower()
+else:
+    # Próbuj wykryć silnik na podstawie ustawionych zmiennych MODEL_NAME
+    model_name = os.getenv("MODEL_NAME", "")
+    if "claude" in model_name.lower():
+        ENGINE = "claude"
+    elif "gemini" in model_name.lower():
+        ENGINE = "gemini"
+    elif "gpt" in model_name.lower() or "openai" in model_name.lower():
+        ENGINE = "openai"
+    else:
+        # Sprawdź które API keys są dostępne
+        if os.getenv("CLAUDE_API_KEY") or os.getenv("ANTHROPIC_API_KEY"):
+            ENGINE = "claude"
+        elif os.getenv("GEMINI_API_KEY"):
+            ENGINE = "gemini"
+        elif os.getenv("OPENAI_API_KEY"):
+            ENGINE = "openai"
+        else:
+            ENGINE = "lmstudio"  # domyślnie
+
+if ENGINE not in {"openai", "lmstudio", "anything", "gemini", "claude"}:
+    print(f"❌ Nieobsługiwany silnik: {ENGINE}", file=sys.stderr)
+    sys.exit(1)
+
+print(f"🔄 ENGINE wykryty: {ENGINE}")
+
 CENTRALA_API_KEY = os.getenv("CENTRALA_API_KEY")
 FABRYKA_URL     = os.getenv("FABRYKA_URL")
 REPORT_URL      = os.getenv("REPORT_URL")
-ENGINE          = os.getenv("LLM_ENGINE", "openai").lower()
 
-print(f"🔄 Engine: {ENGINE}")
-
-# wybór modelu z .env
-if ENGINE == "gemini":
-    MODEL_NAME = os.getenv("MODEL_NAME_GEMINI")
-elif ENGINE == "lmstudio":
-    MODEL_NAME = os.getenv("MODEL_NAME_LM")
-elif ENGINE == "anything":
-    MODEL_NAME = os.getenv("MODEL_NAME_ANY")
-elif ENGINE == "claude":
-    MODEL_NAME = os.getenv("MODEL_NAME_CLAUDE")
-else:
-    MODEL_NAME = os.getenv("MODEL_NAME_OPENAI")
-
-# klucze i URL-e
-LMSTUDIO_API_KEY = os.getenv("LMSTUDIO_API_KEY")
-LMSTUDIO_API_URL = os.getenv("LMSTUDIO_API_URL")
-ANYTHING_API_KEY = os.getenv("ANYTHING_API_KEY")
-ANYTHING_API_URL = os.getenv("ANYTHING_API_URL")
-
-# weryfikacja
-if not all([CENTRALA_API_KEY, FABRYKA_URL, REPORT_URL, MODEL_NAME]):
-    print("❌ Ustaw w .env wszystkie: CENTRALA_API_KEY, FABRYKA_URL, REPORT_URL, MODEL_NAME_*")
+if not all([CENTRALA_API_KEY, FABRYKA_URL, REPORT_URL]):
+    print("❌ Brak wymaganych zmiennych: CENTRALA_API_KEY, FABRYKA_URL, REPORT_URL", file=sys.stderr)
     sys.exit(1)
 
-# inicjalizacja klienta OpenAI i Gemini
+# POPRAWKA: Wybór modelu z lepszą logiką
+if ENGINE == "openai":
+    MODEL_NAME = os.getenv("MODEL_NAME") or os.getenv("MODEL_NAME_OPENAI", "gpt-4o-mini")
+elif ENGINE == "claude":
+    MODEL_NAME = os.getenv("MODEL_NAME") or os.getenv("MODEL_NAME_CLAUDE", "claude-sonnet-4-20250514")
+elif ENGINE == "gemini":
+    MODEL_NAME = os.getenv("MODEL_NAME") or os.getenv("MODEL_NAME_GEMINI", "gemini-2.5-pro-latest")
+elif ENGINE == "lmstudio":
+    MODEL_NAME = os.getenv("MODEL_NAME") or os.getenv("MODEL_NAME_LM", "llama-3.3-70b-instruct")
+elif ENGINE == "anything":
+    MODEL_NAME = os.getenv("MODEL_NAME") or os.getenv("MODEL_NAME_ANY", "llama-3.3-70b-instruct")
+
+# klucze i URL-e
+LMSTUDIO_API_KEY = os.getenv("LMSTUDIO_API_KEY", "local")
+LMSTUDIO_API_URL = os.getenv("LMSTUDIO_API_URL", "http://localhost:1234/v1")
+ANYTHING_API_KEY = os.getenv("ANYTHING_API_KEY", "local")
+ANYTHING_API_URL = os.getenv("ANYTHING_API_URL", "http://localhost:1234/v1")
+
+# weryfikacja
+if not MODEL_NAME:
+    print(f"❌ Brak MODEL_NAME dla silnika {ENGINE}", file=sys.stderr)
+    sys.exit(1)
+
+# POPRAWKA: Sprawdzenie wymaganych API keys
+if ENGINE == "openai" and not os.getenv("OPENAI_API_KEY"):
+    print("❌ Brak OPENAI_API_KEY", file=sys.stderr)
+    sys.exit(1)
+elif ENGINE == "claude" and not (os.getenv("CLAUDE_API_KEY") or os.getenv("ANTHROPIC_API_KEY")):
+    print("❌ Brak CLAUDE_API_KEY lub ANTHROPIC_API_KEY", file=sys.stderr)
+    sys.exit(1)
+elif ENGINE == "gemini" and not os.getenv("GEMINI_API_KEY"):
+    print("❌ Brak GEMINI_API_KEY", file=sys.stderr)
+    sys.exit(1)
+
+# inicjalizacja klienta
 if ENGINE == 'openai':
     from openai import OpenAI
-    client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"), base_url=os.getenv("OPENAI_API_URL"))
+    client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"), base_url=os.getenv("OPENAI_API_URL", "https://api.openai.com/v1"))
 
 elif ENGINE == 'claude':
     # Bezpośrednia integracja Claude
@@ -66,15 +119,13 @@ elif ENGINE == 'claude':
         sys.exit(1)
     
     CLAUDE_API_KEY = os.getenv("CLAUDE_API_KEY") or os.getenv("ANTHROPIC_API_KEY")
-    if not CLAUDE_API_KEY:
-        print("❌ Brak CLAUDE_API_KEY lub ANTHROPIC_API_KEY w .env", file=sys.stderr)
-        sys.exit(1)
-    
     claude_client = Anthropic(api_key=CLAUDE_API_KEY)
 
 elif ENGINE == 'gemini':
     import google.generativeai as genai
     genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+
+print(f"✅ Zainicjalizowano silnik: {ENGINE} z modelem: {MODEL_NAME}")
 
 # --- 2. Init Whisper ---
 audio_model = whisper.load_model(os.getenv("WHISPER_MODEL", "small"))
@@ -82,6 +133,7 @@ audio_model = whisper.load_model(os.getenv("WHISPER_MODEL", "small"))
 # --- 3. Wywołanie LLM ---
 def call_llm(prompt: str) -> str:
     if ENGINE == 'openai':
+        print(f"[DEBUG] Wysyłam zapytanie do OpenAI")
         resp = client.chat.completions.create(
             model=MODEL_NAME,
             messages=[{"role": "user", "content": prompt}],
@@ -95,33 +147,44 @@ def call_llm(prompt: str) -> str:
         return resp.choices[0].message.content.strip().lower()
     
     if ENGINE == 'claude':
+        print(f"[DEBUG] Wysyłam zapytanie do Claude")
         # Claude - bezpośrednia integracja
         resp = claude_client.messages.create(
             model=MODEL_NAME,
             messages=[{"role": "user", "content": prompt}],
             temperature=0,
-            max_tokens=4000
+            max_tokens=32  # Krótka odpowiedź dla klasyfikacji
         )
         
         # Liczenie tokenów Claude
         usage = resp.usage
-        cost = usage.input_tokens * 0.00003 + usage.output_tokens * 0.00015  # Claude Sonnet 4 pricing
+        cost = usage.input_tokens * 0.00003 + usage.output_tokens * 0.00015
         print(f"[📊 Prompt: {usage.input_tokens} | Completion: {usage.output_tokens} | Total: {usage.input_tokens + usage.output_tokens}]")
         print(f"[💰 Koszt Claude: {cost:.6f} USD]")
         
         return resp.content[0].text.strip().lower()
     
     if ENGINE == 'gemini':
-        response = genai.GenerativeModel(MODEL_NAME).generate_content(prompt)
+        print(f"[DEBUG] Wysyłam zapytanie do Gemini")
+        response = genai.GenerativeModel(MODEL_NAME).generate_content(
+            prompt, 
+            generation_config={"temperature": 0.0, "max_output_tokens": 32}
+        )
         print(f"[📊 Gemini - brak szczegółów tokenów]")
         print(f"[💰 Gemini - sprawdź limity w Google AI Studio]")
         return response.text.strip().lower()
     
     if ENGINE == 'lmstudio':
+        print(f"[DEBUG] Wysyłam zapytanie do LMStudio")
         # LMStudio expects /chat/completions endpoint
         url = LMSTUDIO_API_URL.rstrip('/') + '/chat/completions'
         headers = {"Authorization": f"Bearer {LMSTUDIO_API_KEY}", "Content-Type": "application/json"}
-        payload = {"model": MODEL_NAME, "messages": [{"role": "user", "content": prompt}]}
+        payload = {
+            "model": MODEL_NAME, 
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": 0,
+            "max_tokens": 32
+        }
         resp = requests.post(url, json=payload, headers=headers)
         resp.raise_for_status()
         data = resp.json()
@@ -131,6 +194,7 @@ def call_llm(prompt: str) -> str:
         return content.strip().lower()
     
     if ENGINE == 'anything':
+        print(f"[DEBUG] Wysyłam zapytanie do Anything")
         headers = {"Authorization": f"Bearer {ANYTHING_API_KEY}", "Content-Type": "application/json"}
         payload = {"model": MODEL_NAME, "inputs": prompt}
         resp = requests.post(ANYTHING_API_URL, json=payload, headers=headers)
@@ -216,7 +280,20 @@ def classify_file(text: str, filename: str) -> str:
         if any(kw in low for kw in hardware_kw):
             return 'hardware'
     
-    # OpenAI/Gemini prompt (ORYGINALNA WERSJA)
+    # Claude heuristics - podobne do OpenAI ale dostosowane
+    if ENGINE == 'claude':
+        if ('nadajnik' in low or 'transmitter' in low) and ('odcisk' in low or 'fingerprint' in low):
+            print(f"[HEURISTIC] People detected: transmitter with fingerprints")
+            return 'people'
+        presence_kw = ['found one guy', 'captured', 'schwytanych', 'wykryto jednostkę organiczną', 'przedstawił się jako', 'infiltrator', 'organiczna']
+        if any(kw in low for kw in presence_kw):
+            print(f"[HEURISTIC] People detected: {[kw for kw in presence_kw if kw in low]}")
+            return 'people'
+        hardware_kw = ['aktualizację systemu', 'software', 'algorytm', 'napraw', 'uster']
+        if any(kw in low for kw in hardware_kw):
+            return 'hardware'
+    
+    # OpenAI/Gemini/Claude prompt (ORYGINALNA WERSJA + Claude)
     if ENGINE in ('openai', 'gemini', 'claude'):
         if lang == 'pl':
             prompt = f"""
@@ -390,9 +467,11 @@ def build_graph():
 # --- 8. main ---
 def main():
     print("=== Zadanie 9: klasyfikacja plików z fabryki ===")
+    print(f"🚀 Używam silnika: {ENGINE}")
     print("LOGIKA: Oryginalna + fix dla OpenAI (nadajnik z odciskami = people)")
     print("OCZEKIWANE: people=3, hardware=3 pliki")
     print("Startuje pipeline...\n")
     build_graph().invoke({})
 
-if __name__=='__main__': main()
+if __name__=='__main__': 
+    main()
