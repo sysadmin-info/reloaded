@@ -74,6 +74,15 @@ Uruchom w PowerShell jako administrator:
 choco install ffmpeg tesseract
 ```
 
+### LM Studio i Anything LLM
+
+Pobierz i zainstaluj:
+
+[LM Studio](https://lmstudio.ai/)
+[Anything LLM](https://anythingllm.com/)
+
+Najpierw pobierz kilka modeli w LM Studio, a następnie naucz się go używać. W Anything LLM ustaw backend na LM Studio z rozwijanej listy (automatycznie rozpozna dostępne modele).
+
 Następnie uruchom:
 
 ```powershell
@@ -158,6 +167,15 @@ Run in PowerShell as administrator:
 ```powershell
 choco install ffmpeg tesseract
 ```
+
+### LM Studio and Anything LLM
+
+Download and install:
+
+[LM Studio](https://lmstudio.ai/)
+[Anything LLM](https://anythingllm.com/)
+
+First download some models in LM Studio, then learn how to use it. In Anything LLM set the backend to LM Studio from a dropdown list (it will automatically recognize available models).
 
 Then run:
 
