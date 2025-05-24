@@ -8,6 +8,7 @@ zad7.py - Multi-engine obraz robota: OpenAI (DALL-E), LM Studio, Anything, Gemin
 - Prompt pobierany dynamicznie z Centrali
 - Claude NIE OBSŁUGUJE generowania obrazów - dodano komunikat informacyjny
 - BEZPOŚREDNIA INTEGRACJA Claude (jak zad1.py i zad2.py)
+- POPRAWKA: Lepsze wykrywanie silnika z agent.py
 
 Wymagane zmienne środowiskowe (w .env):
 - OPENAI_API_KEY, OPENAI_API_URL (opcjonalnie), MODEL_NAME_IMAGE
@@ -25,7 +26,7 @@ import time
 import platform
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(override=True)
 
 ANSI_GREEN = "\033[92m"
 ANSI_RESET = "\033[0m"
@@ -121,10 +122,43 @@ def main():
                         help="Katalog output ComfyUI (domyślnie wykrywany)")
     args = parser.parse_args()
 
-    ENGINE = (args.engine or os.getenv("LLM_ENGINE", "openai")).lower()
-    WORKFLOW = args.workflow
+    # POPRAWKA: Lepsze wykrywanie silnika (jak w poprawionych zad1.py-zad6.py)
+    ENGINE = None
+    if args.engine:
+        ENGINE = args.engine.lower()
+    elif os.getenv("LLM_ENGINE"):
+        ENGINE = os.getenv("LLM_ENGINE").lower()
+    else:
+        # Próbuj wykryć silnik na podstawie ustawionych zmiennych MODEL_NAME
+        model_name = os.getenv("MODEL_NAME", "")
+        if "claude" in model_name.lower():
+            ENGINE = "claude"
+        elif "gemini" in model_name.lower():
+            ENGINE = "gemini"
+        elif "gpt" in model_name.lower() or "openai" in model_name.lower():
+            ENGINE = "openai"
+        else:
+            # Sprawdź które API keys są dostępne
+            if os.getenv("OPENAI_API_KEY"):
+                ENGINE = "openai"  # DALL-E jest najlepszy do obrazów
+            elif os.getenv("LOCAL_SD_API_URL"):
+                ENGINE = "comfyui"  # lokalna alternatywa
+            else:
+                ENGINE = "openai"  # domyślnie (generowanie obrazów wymaga chmury)
 
-    print(f"🔄 Engine: {ENGINE}")
+    if ENGINE not in {"openai", "lmstudio", "anything", "gemini", "claude", "comfyui"}:
+        print(f"❌ Nieobsługiwany silnik: {ENGINE}", file=sys.stderr)
+        sys.exit(1)
+
+    print(f"🔄 ENGINE wykryty: {ENGINE}")
+
+    # Sprawdzenie czy wybrany silnik obsługuje generowanie obrazów
+    if ENGINE in {"claude", "gemini"}:
+        print(f"❌ {ENGINE} nie obsługuje generowania obrazów.", file=sys.stderr)
+        print("💡 Użyj --engine openai (DALL-E) lub comfyui (lokalne) dla generowania obrazów.", file=sys.stderr)
+        sys.exit(1)
+
+    WORKFLOW = args.workflow
 
     # Ustal OUTPUT_DIR dynamicznie jeśli nie podano
     if args.output_dir:
@@ -143,20 +177,27 @@ def main():
     REPORT_URL = os.getenv("REPORT_URL", "")
     CENTRALA_API_KEY = os.getenv("CENTRALA_API_KEY", "")
     LOCAL_SD_API_URL = os.getenv("LOCAL_SD_API_URL", "http://localhost:8074")
-    MODEL_NAME_IMAGE = os.getenv("MODEL_NAME_IMAGE", "dall-e-3")
+    MODEL_NAME_IMAGE = os.getenv("MODEL_NAME_IMAGE", "dall-e-3")  # Używaj dedykowanej zmiennej do obrazów
 
     if not CENTRALA_API_KEY or not REPORT_URL:
         print("❌ Brak ustawienia CENTRALA_API_KEY lub REPORT_URL w .env", file=sys.stderr)
         sys.exit(1)
 
-    # Sprawdź dostępność ComfyUI API dla lokalnych silników
-    if ENGINE in {"lmstudio", "anything", "comfyui"}:
+    # Sprawdzenie wymaganych API keys/zasobów
+    if ENGINE == "openai" and not OPENAI_API_KEY:
+        print("❌ Brak OPENAI_API_KEY dla DALL-E", file=sys.stderr)
+        sys.exit(1)
+    elif ENGINE in {"lmstudio", "anything", "comfyui"}:
         check_comfyui_api(LOCAL_SD_API_URL)
+
+    print(f"✅ Zainicjalizowano silnik: {ENGINE} z obsługą generowania obrazów")
 
     # 1. Pobranie opisu robota
     ROBOT_URL = os.getenv("ROBOT_URL")
     if ROBOT_URL is None:
-        raise ValueError("ROBOT_URL environment variable is not set.")
+        print("❌ Brak ROBOT_URL w .env", file=sys.stderr)
+        sys.exit(1)
+        
     print(banner("Opis robota (dynamiczny)"))
     try:
         resp = requests.get(ROBOT_URL, timeout=10)
@@ -172,12 +213,10 @@ def main():
     print(description)
     prompt = description
 
+    print(f"🚀 Używam silnika: {ENGINE}")
     image_url = None
 
     if ENGINE == "openai":
-        if not OPENAI_API_KEY:
-            print("❌ Brak OPENAI_API_KEY w .env", file=sys.stderr)
-            sys.exit(1)
         try:
             from openai import OpenAI
         except ImportError:
@@ -185,6 +224,7 @@ def main():
             sys.exit(1)
         img_client = OpenAI(api_key=OPENAI_API_KEY, base_url=OPENAI_API_URL)
         print(banner("Generowanie obrazu (OpenAI/DALL-E)"))
+        print(f"[DEBUG] Używam modelu: {MODEL_NAME_IMAGE}")
         try:
             resp_img = img_client.images.generate(
                 model=MODEL_NAME_IMAGE,
@@ -200,6 +240,8 @@ def main():
             sys.exit(1)
     elif ENGINE in {"lmstudio", "anything", "comfyui"}:
         print(banner("Generowanie obrazu (ComfyUI API)"))
+        print(f"[DEBUG] Workflow: {WORKFLOW}")
+        print(f"[DEBUG] Output dir: {OUTPUT_DIR}")
         image_url = generate_with_comfyui(prompt, WORKFLOW, LOCAL_SD_API_URL, OUTPUT_DIR)
         print(f"[📊 ComfyUI - model lokalny]")
         print(f"[💰 ComfyUI - brak kosztów]")
