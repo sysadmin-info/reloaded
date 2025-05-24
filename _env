@@ -1,30 +1,75 @@
-ROBOT_LOGIN_URL=https://xyz.XXX.XXX/
-ROBOT_USERNAME=
-ROBOT_PASSWORD=
-REPORT_URL=https://XXX.XXX.XXX/report
-CENTRALA_API_KEY=Twój_klucz_z_centrali
-DATA_URL=https://XXX.XXX.XXX/dane/przesluchania.zip
-SOURCE_URL=https://XXX.XXX.XXX/data/Twój_klucz_z_centrali/json.txt
-CENZURA_URL=https://XXX.XXX.XXX/data/Twój_klucz_z_centrali/cenzura.txt
-OPENAI_API_KEY=OpenAI_API_key
+# Silnik LLM (domyślnie OpenAI, zmieniaj w agent.py)
+LLM_ENGINE=openai
+
+############################################################ Anthropic ############################################################
+
+# Claude/Anthropic API
+CLAUDE_API_KEY=sk-ant-api03-twój_klucz_claude_tutaj
+# lub alternatywnie:
+# ANTHROPIC_API_KEY=sk-ant-api03-your_claude_key_here
+
+# Model Claude
+MODEL_NAME_CLAUDE=claude-sonnet-4-20250514
+
+############################################################ OpenAI ############################################################
+
+# OpenAI API
+OPENAI_API_KEY=sk-proj-twój_klucz_openai_tutaj
 OPENAI_API_URL=https://api.openai.com/v1
+
+# Model do generowania obrazów
+MODEL_NAME_IMAGE=dall-e-3
+
+# Model dla chatu
+MODEL_NAME_OPENAI=gpt-4o
+
+# Model do ropoznawania obrazów
+MODEL_NAME_VISION=gpt-4o
+
+# Model do transkrypcji dźwięku na tekst
+WHISPER_MODEL=base
+
+############################################################ Alphabet / Gemini ############################################################
+
+# Gemini / Google API
+GEMINI_API_KEY=twój_klucz_claude_tutaj
+MODEL_NAME_GEMINI=gemini-1.5-pro-latest
+MODEL_NAME_GEMINI_IMAGE=gemini-2.0-flash
+
+############################################################ Local Models ############################################################
+
+# Model dla chatu
 MODEL_NAME_LM=llama-3.3-70b-instruct
 MODEL_NAME_ANY=llama-3.3-70b-instruct
-MODEL_NAME_OPENAI=gpt-4o-mini
-MODEL_NAME_VISION=gpt-4o
+
+Model do ropoznawania obrazów
 MODEL_NAME_VISION_LM=llama-3.3-70b-instruct
-WHISPER_MODEL=base
+
+Model do transkrypcji dźwięku na tekst
 TRANSCRIBE_API_URL=http://localhost:1234/v1
-GEMINI_API_KEY=Gemini_API_key
-MODEL_NAME_GEMINI=gemini-1.5-pro-latest
-MAP_IMAGE_PATH=mapa.jpg
-MODEL_NAME_IMAGE=dall-e-3
-MODEL_NAME_GEMINI_IMAGE=gemini-2.0-flash
-ROBOT_URL=https://XXX.XXX.XXX/data/Twój_klucz_z_centrali/robotid.json
+
 LMSTUDIO_API_URL=http://localhost:1234/v1
 LMSTUDIO_API_KEY=local
+
 ANYTHING_API_URL=http://localhost:1234/v1
 ANYTHING_API_KEY=local
+
 LOCAL_SD_API_URL=http://localhost:8074
-FABRYKA_URL=https://XXX.XXX.XXX/dane/pliki_z_fabryki.zip
+
+# AI Devs 3 variables
+CENTRALA_API_KEY=Twój_klucz_z_centrali
+REPORT_URL=https://xxx.xxx.xxx/report
+ROBOT_LOGIN_URL=https://xyz.xxx.xxx/
+ROBOT_USERNAME=xxx
+ROBOT_PASSWORD=xxx
+DATA_URL=https://xxx.xxx.xxx/dane/przesluchania.zip
+SOURCE_URL=https://xxx.xxx.xxx/data/Twój_klucz_z_centrali/json.txt
+CENZURA_URL=https://xxx.xxx.xxx/data/Twój_klucz_z_centrali/cenzura.txt
+MAP_IMAGE_PATH=mapa.jpg
+ROBOT_URL=https://xxx.xxx.xxx/data/Twój_klucz_z_centrali/robotid.json
+FABRYKA_URL=https://xxx.xxx.xxx/dane/pliki_z_fabryki.zip
+ARXIV_URL=https://xxx.xxx.xxx/dane/arxiv-draft.html
+ARXIV_QUESTIONS=https://xxx.xxx.xxx/data/Twój_klucz_z_centrali/arxiv.txt
+
+# Tesseract - ustawienie lokalizacji dla ścieżki z językiem polskim
 export TESSDATA_PREFIX=/usr/share/tesseract-ocr/5/tessdata/
