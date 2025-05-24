@@ -130,7 +130,32 @@ print(f"✅ Zainicjalizowano silnik: {ENGINE} z modelem: {MODEL_NAME}")
 # --- 2. Init Whisper ---
 audio_model = whisper.load_model(os.getenv("WHISPER_MODEL", "small"))
 
-# --- 3. Wywołanie LLM ---
+# --- 3. Wywołanie LLM z retry logic ---
+def call_llm_with_retry(prompt: str, max_retries: int = 2) -> str:
+    """Wywołuje LLM z retry logic dla lokalnych modeli"""
+    for attempt in range(max_retries + 1):
+        try:
+            result = call_llm(prompt)
+            
+            # Sprawdź czy odpowiedź zawiera oczekiwane słowa kluczowe
+            import re
+            keywords = re.findall(r'\b(people|hardware|other)\b', result.lower())
+            if keywords:
+                return result
+                
+            # Jeśli nie znaleziono słów kluczowych i to nie ostatnia próba
+            if attempt < max_retries:
+                print(f"[RETRY] Attempt {attempt + 1}/{max_retries + 1} - no valid keywords found, retrying...")
+                continue
+                
+        except Exception as e:
+            if attempt < max_retries:
+                print(f"[RETRY] Attempt {attempt + 1}/{max_retries + 1} failed: {e}, retrying...")
+                continue
+            else:
+                print(f"[ERROR] All retry attempts failed: {e}")
+                
+    return result  # Zwróć ostatnią odpowiedź nawet jeśli błędną
 def call_llm(prompt: str) -> str:
     if ENGINE == 'openai':
         print(f"[DEBUG] Wysyłam zapytanie do OpenAI")
@@ -183,7 +208,8 @@ def call_llm(prompt: str) -> str:
             "model": MODEL_NAME, 
             "messages": [{"role": "user", "content": prompt}],
             "temperature": 0,
-            "max_tokens": 32
+            "max_tokens": 5,  # BARDZO krótka odpowiedź
+            "stop": ["\n", ".", " "]  # Zatrzymaj na pierwszym słowie
         }
         resp = requests.post(url, json=payload, headers=headers)
         resp.raise_for_status()
@@ -280,7 +306,7 @@ def classify_file(text: str, filename: str) -> str:
         if any(kw in low for kw in hardware_kw):
             return 'hardware'
     
-    # Claude heuristics - podobne do OpenAI ale dostosowane
+    # Claude heuristics - podobne do OpenAI ale dostosowane + lepsze edge cases
     if ENGINE == 'claude':
         if ('nadajnik' in low or 'transmitter' in low) and ('odcisk' in low or 'fingerprint' in low):
             print(f"[HEURISTIC] People detected: transmitter with fingerprints")
@@ -289,8 +315,18 @@ def classify_file(text: str, filename: str) -> str:
         if any(kw in low for kw in presence_kw):
             print(f"[HEURISTIC] People detected: {[kw for kw in presence_kw if kw in low]}")
             return 'people'
-        hardware_kw = ['aktualizację systemu', 'software', 'algorytm', 'napraw', 'uster']
+        
+        # POPRAWKA: Lepsze rozróżnienie hardware vs software
+        # Software updates/aktualizacje = other, nie hardware
+        software_kw = ['aktualizacja systemu', 'system update', 'software', 'algorytm', 'moduł ai']
+        if any(kw in low for kw in software_kw):
+            print(f"[HEURISTIC] Software update detected (not hardware): {[kw for kw in software_kw if kw in low]}")
+            return 'other'
+            
+        # Hardware = fizyczne naprawy, wymiany części
+        hardware_kw = ['naprawa anteny', 'wymiana ogniw', 'usterka spowodowana', 'zwarcie kabli', 'uszkodzenie']
         if any(kw in low for kw in hardware_kw):
+            print(f"[HEURISTIC] Hardware repair detected: {[kw for kw in hardware_kw if kw in low]}")
             return 'hardware'
     
     # OpenAI/Gemini/Claude prompt (ORYGINALNA WERSJA + Claude)
@@ -325,55 +361,57 @@ Answer only: people/hardware/other.
 Only classify as 'people' if actual capture or presence is confirmed. 
 Mere searches or absence should be classified as 'other'.
 """
-    # LMStudio/Anything detailed few-shot (ORYGINALNA WERSJA)
+    # LMStudio/Anything detailed few-shot (POPRAWIONA WERSJA)
     else:
-        examples = [
-            {"filename": "sector_gate.mp3", "content": "We captured two infiltrators near the gate.", "category": "people"},
-            {"filename": "antenna_repair.png", "content": "REPAIR NOTE: antenna module replaced at 07:30, hardware malfunction solved.", "category": "hardware"}
-        ]
         if lang == 'pl':
             prompt = f"""
+KLASYFIKACJA PLIKU:
+
 Plik: {filename}
-Zawartość:
-{text}
+Treść: {text}
 
-Przykłady:
-- Plik: {examples[0]['filename']}, Zawartość: {examples[0]['content']}, Kategoria: {examples[0]['category']}
-- Plik: {examples[1]['filename']}, Zawartość: {examples[1]['content']}, Kategoria: {examples[1]['category']}
+ZADANIE: Odpowiedz TYLKO jednym słowem: people, hardware lub other
 
-Zadanie: przypisz do jednej z kategorii:
-- people (informacje o schwytanych ludziach lub ich śladach obecności)
-- hardware (naprawione usterki hardware'u)
-- other (wszystko inne)
+ZASADY:
+- people = schwytane osoby, wykryte obecności ludzi
+- hardware = naprawy sprzętu, usterki, wymiany części  
+- other = wszystko inne
 
-Odpowiedz jednym słowem: people, hardware lub other.
-"""
+ODPOWIEDŹ (tylko jedno słowo):"""
         else:
             prompt = f"""
+FILE CLASSIFICATION:
+
 File: {filename}
-Content:
-{text}
+Content: {text}
 
-Examples:
-- File: {examples[0]['filename']}, Content: {examples[0]['content']}, Category: {examples[0]['category']}
-- File: {examples[1]['filename']}, Content: {examples[1]['content']}, Category: {examples[1]['category']}
+TASK: Answer with ONLY one word: people, hardware or other
 
-Task: classify into one of:
-- people (notes about captured individuals or traces of their presence)
-- hardware (fixed hardware malfunctions)
-- other (anything else)
+RULES:
+- people = captured persons, detected human presence
+- hardware = equipment repairs, malfunctions, part replacements
+- other = everything else
 
-Answer one word: people, hardware or other.
-"""
+ANSWER (one word only):"""
     
-    result = call_llm(prompt)
+    result = call_llm_with_retry(prompt)
     cat = result.strip().lower()
+    
+    # POPRAWKA: Post-processing odpowiedzi - wyciągnij tylko słowo kluczowe
+    # Dla lokalnych modeli które mogą gadać za dużo
+    import re
+    
+    # Szukaj first match people/hardware/other w odpowiedzi
+    keywords = re.findall(r'\b(people|hardware|other)\b', cat)
+    if keywords:
+        cat = keywords[0]  # Użyj pierwszego znalezionego
+        print(f"[POST-PROCESS] Extracted keyword: {cat}")
     
     # Walidacja odpowiedzi
     if cat in {'people', 'hardware', 'other'}:
         return cat
     else:
-        print(f"[WARNING] Nieoczekiwana odpowiedź LLM: '{result}' -> defaulting to 'other'")
+        print(f"[WARNING] Nieoczekiwana odpowiedź LLM: '{result[:100]}...' -> defaulting to 'other'")
         return 'other'
 
 # --- 7. Pipeline LangGraph ---
