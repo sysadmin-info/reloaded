@@ -1,24 +1,11 @@
 #!/usr/bin/env python3
 """
-robot_login.py  (multi-engine)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+robot_login.py  (multi-engine + Claude)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Automatyzuje logowanie do systemu robotów z pytaniem anty-captcha
 i rozwiązuje je za pomocą wybranego silnika LLM
-(OpenAI, LM Studio, LocalAI / Anything LLM, Gemini Google).
-
-Po zalogowaniu:
-  1. drukuje pełny HTML sekretnej strony,
-  2. wypisuje znalezioną flagę,
-  3. pobiera i wyświetla wszystkie pliki *.txt* (linkowane i wzmiankowane).
-
-CLI / zmienne środowiskowe
---------------------------
---engine {openai,lmstudio,anything,gemini}
-OPENAI_API_KEY   - klucz („local” dla LM Studio / LocalAI)
-OPENAI_API_URL  - nadpisuje domyślny base_url
-MODEL_NAME       - id modelu dla LM Studio / LocalAI (np. mistral.gguf)
-GEMINI_API_KEY   - klucz API Gemini Google
-MODEL_NAME_GEMINI - id modelu Gemini (np. gemini-2.5-pro-latest)
+(OpenAI, LM Studio, LocalAI / Anything LLM, Gemini Google, Claude Anthropic).
+DODANO: Obsługę Claude z kompatybilnym interfejsem
 """
 
 from __future__ import annotations
@@ -34,11 +21,19 @@ import requests
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 
+# Import Claude integration
+try:
+    from claude_integration import setup_claude_for_task, add_token_counting_to_openai_call
+except ImportError:
+    print("❌ Brak claude_integration.py - skopiuj plik z artefaktu")
+    # Kontynuujemy bez Claude
+    pass
+
 # ── 0. CLI / env - wybór silnika ──────────────────────────────────────────────
 load_dotenv(override=True)
 
-parser = argparse.ArgumentParser(description="Login + captcha solver (multi-engine)")
-parser.add_argument("--engine", choices=["openai", "lmstudio", "anything", "gemini"],
+parser = argparse.ArgumentParser(description="Login + captcha solver (multi-engine + Claude)")
+parser.add_argument("--engine", choices=["openai", "lmstudio", "anything", "gemini", "claude"],
                     help="LLM backend to use")
 args = parser.parse_args()
 
@@ -75,6 +70,15 @@ elif ENGINE == "anything":
     MODEL_NAME = os.getenv("MODEL_NAME_ANY", os.getenv("MODEL_NAME", "llama-3.3-70b-instruct"))
     from openai import OpenAI
     client = OpenAI(api_key=ANYTHING_API_KEY, base_url=ANYTHING_API_URL)
+
+elif ENGINE == "claude":
+    # Inicjalizacja Claude
+    try:
+        claude_client, MODEL_NAME = setup_claude_for_task(ENGINE)
+        client = claude_client
+    except:
+        print("❌ Błąd inicjalizacji Claude - sprawdź claude_integration.py i CLAUDE_API_KEY", file=sys.stderr)
+        sys.exit(1)
 
 elif ENGINE == "gemini":
     import google.generativeai as genai
@@ -118,19 +122,40 @@ def ask_llm(question: str) -> str:
             temperature=0,
         )
         raw = resp.choices[0].message.content.strip()
+        
+        # Liczenie tokenów (już było w oryginalnym kodzie)
         tokens = resp.usage
         print(f"[📊 Prompt: {tokens.prompt_tokens} | Completion: {tokens.completion_tokens} | Total: {tokens.total_tokens}]")
         if ENGINE == "openai":
             cost = tokens.prompt_tokens/1_000_000*0.60 + tokens.completion_tokens/1_000_000*2.40
             print(f"[💰 Koszt OpenAI: {cost:.6f} USD]")
+        elif ENGINE in {"lmstudio", "anything"}:
+            print(f"[💰 Model lokalny - brak kosztów]")
+        
         m = re.search(r"(\d{1,4})", raw)
         return m.group(1) if m else raw
+    
+    elif ENGINE == "claude":
+        resp = client.chat_completions_create(
+            model=MODEL_NAME,
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user",   "content": question},
+            ],
+            temperature=0,
+        )
+        raw = resp.choices[0].message.content.strip()
+        m = re.search(r"(\d{1,4})", raw)
+        return m.group(1) if m else raw
+    
     elif ENGINE == "gemini":
         response = model_gemini.generate_content(
             [SYSTEM_PROMPT, question],
             generation_config={"temperature": 0.0, "max_output_tokens": 16}
         )
         raw = response.text.strip()
+        print(f"[📊 Gemini - brak szczegółów tokenów]")
+        print(f"[💰 Gemini - sprawdź limity w Google AI Studio]")
         m = re.search(r"(\d{1,4})", raw)
         return m.group(1) if m else raw
 
