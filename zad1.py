@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """
-robot_login.py  (multi-engine + Claude)
+S01E01  (multi-engine + Claude)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Automatyzuje logowanie do systemu robotów z pytaniem anty-captcha
 i rozwiązuje je za pomocą wybranego silnika LLM
 (OpenAI, LM Studio, LocalAI / Anything LLM, Gemini Google, Claude Anthropic).
 DODANO: Obsługę Claude z kompatybilnym interfejsem
+POPRAWKA: Lepsze wykrywanie silnika z agent.py
 """
 
 from __future__ import annotations
@@ -21,12 +22,11 @@ import requests
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 
-# Import Claude integration
+# Import Claude integration (opcjonalny)
 try:
     from claude_integration import setup_claude_for_task, add_token_counting_to_openai_call
 except ImportError:
-    print("❌ Brak claude_integration.py - skopiuj plik z artefaktu")
-    # Kontynuujemy bez Claude
+    # Kontynuujemy bez Claude - brak komunikatu o błędzie
     pass
 
 # ── 0. CLI / env - wybór silnika ──────────────────────────────────────────────
@@ -37,12 +37,46 @@ parser.add_argument("--engine", choices=["openai", "lmstudio", "anything", "gemi
                     help="LLM backend to use")
 args = parser.parse_args()
 
-ENGINE = (args.engine or os.getenv("LLM_ENGINE", "openai")).lower()
+# POPRAWKA: Lepsze wykrywanie silnika
+# 1. Argument z CLI
+# 2. Zmienna LLM_ENGINE z .env  
+# 3. Wykrywanie na podstawie MODEL_NAME (ustawianego przez agent.py)
+# 4. Domyślnie lmstudio
+ENGINE = None
+if args.engine:
+    ENGINE = args.engine.lower()
+elif os.getenv("LLM_ENGINE"):
+    ENGINE = os.getenv("LLM_ENGINE").lower()
+else:
+    # Próbuj wykryć silnik na podstawie ustawionych zmiennych MODEL_NAME
+    model_name = os.getenv("MODEL_NAME", "")
+    if "claude" in model_name.lower():
+        ENGINE = "claude"
+    elif "gemini" in model_name.lower():
+        ENGINE = "gemini"
+    elif "gpt" in model_name.lower() or "openai" in model_name.lower():
+        ENGINE = "openai"
+    else:
+        # Sprawdź które API keys są dostępne
+        if os.getenv("CLAUDE_API_KEY") or os.getenv("ANTHROPIC_API_KEY"):
+            ENGINE = "claude"
+        elif os.getenv("GEMINI_API_KEY"):
+            ENGINE = "gemini"
+        elif os.getenv("OPENAI_API_KEY"):
+            ENGINE = "openai"
+        else:
+            ENGINE = "lmstudio"  # domyślnie
+
+print(f"🔄 ENGINE wykryty: {ENGINE}")
 
 # ── 1. Dane logowania / stałe ────────────────────────────────────────────────
 LOGIN_URL = os.getenv("ROBOT_LOGIN_URL")
 USERNAME  = os.getenv("ROBOT_USERNAME")
 PASSWORD  = os.getenv("ROBOT_PASSWORD")
+
+if not all([LOGIN_URL, USERNAME, PASSWORD]):
+    print("❌ Brak wymaganych zmiennych: ROBOT_LOGIN_URL, ROBOT_USERNAME, ROBOT_PASSWORD", file=sys.stderr)
+    sys.exit(1)
 
 ANSI_GREEN = "\033[92m"
 ANSI_RESET = "\033[0m"
@@ -53,32 +87,47 @@ SYSTEM_PROMPT = "Odpowiedz krótko: sama liczba / jedno słowo, bez wyjaśnień.
 if ENGINE == "openai":
     OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
     OPENAI_API_URL = os.getenv("OPENAI_API_URL", "https://api.openai.com/v1")
-    MODEL_NAME = os.getenv("MODEL_NAME_OPENAI", "gpt-4o-mini")
+    MODEL_NAME = os.getenv("MODEL_NAME") or os.getenv("MODEL_NAME_OPENAI", "gpt-4o-mini")
+    if not OPENAI_API_KEY:
+        print("❌ Brak OPENAI_API_KEY", file=sys.stderr)
+        sys.exit(1)
     from openai import OpenAI
     client = OpenAI(api_key=OPENAI_API_KEY, base_url=OPENAI_API_URL)
 
 elif ENGINE == "lmstudio":
     LMSTUDIO_API_KEY = os.getenv("LMSTUDIO_API_KEY", "local")
     LMSTUDIO_API_URL = os.getenv("LMSTUDIO_API_URL", "http://localhost:1234/v1")
-    MODEL_NAME = os.getenv("MODEL_NAME_LM", os.getenv("MODEL_NAME", "llama-3.3-70b-instruct"))
+    MODEL_NAME = os.getenv("MODEL_NAME") or os.getenv("MODEL_NAME_LM", "llama-3.3-70b-instruct")
+    print(f"[DEBUG] LMStudio URL: {LMSTUDIO_API_URL}")
+    print(f"[DEBUG] LMStudio Model: {MODEL_NAME}")
     from openai import OpenAI
-    client = OpenAI(api_key=LMSTUDIO_API_KEY, base_url=LMSTUDIO_API_URL)
+    client = OpenAI(api_key=LMSTUDIO_API_KEY, base_url=LMSTUDIO_API_URL, timeout=60)
 
 elif ENGINE == "anything":
     ANYTHING_API_KEY = os.getenv("ANYTHING_API_KEY", "local")
     ANYTHING_API_URL = os.getenv("ANYTHING_API_URL", "http://localhost:1234/v1")
-    MODEL_NAME = os.getenv("MODEL_NAME_ANY", os.getenv("MODEL_NAME", "llama-3.3-70b-instruct"))
+    MODEL_NAME = os.getenv("MODEL_NAME") or os.getenv("MODEL_NAME_ANY", "llama-3.3-70b-instruct")
+    print(f"[DEBUG] Anything URL: {ANYTHING_API_URL}")
+    print(f"[DEBUG] Anything Model: {MODEL_NAME}")
     from openai import OpenAI
-    client = OpenAI(api_key=ANYTHING_API_KEY, base_url=ANYTHING_API_URL)
+    client = OpenAI(api_key=ANYTHING_API_KEY, base_url=ANYTHING_API_URL, timeout=60)
 
 elif ENGINE == "claude":
-    # Inicjalizacja Claude
+    # Bezpośrednia integracja Claude
     try:
-        claude_client, MODEL_NAME = setup_claude_for_task(ENGINE)
-        client = claude_client
-    except:
-        print("❌ Błąd inicjalizacji Claude - sprawdź claude_integration.py i CLAUDE_API_KEY", file=sys.stderr)
+        from anthropic import Anthropic
+    except ImportError:
+        print("❌ Musisz zainstalować anthropic: pip install anthropic", file=sys.stderr)
         sys.exit(1)
+    
+    CLAUDE_API_KEY = os.getenv("CLAUDE_API_KEY") or os.getenv("ANTHROPIC_API_KEY")
+    if not CLAUDE_API_KEY:
+        print("❌ Brak CLAUDE_API_KEY lub ANTHROPIC_API_KEY w .env", file=sys.stderr)
+        sys.exit(1)
+    
+    MODEL_NAME = os.getenv("MODEL_NAME") or os.getenv("MODEL_NAME_CLAUDE", "claude-sonnet-4-20250514")
+    print(f"[DEBUG] Claude Model: {MODEL_NAME}")
+    claude_client = Anthropic(api_key=CLAUDE_API_KEY)
 
 elif ENGINE == "gemini":
     import google.generativeai as genai
@@ -86,12 +135,15 @@ elif ENGINE == "gemini":
     if not GEMINI_API_KEY:
         print("❌ Brak GEMINI_API_KEY w .env lub zmiennych środowiskowych.", file=sys.stderr)
         sys.exit(1)
-    MODEL_NAME = os.getenv("MODEL_NAME_GEMINI", "gemini-2.5-pro-latest")
+    MODEL_NAME = os.getenv("MODEL_NAME") or os.getenv("MODEL_NAME_GEMINI", "gemini-2.5-pro-latest")
+    print(f"[DEBUG] Gemini Model: {MODEL_NAME}")
     genai.configure(api_key=GEMINI_API_KEY)
     model_gemini = genai.GenerativeModel(MODEL_NAME)
 else:
     print("❌ Nieobsługiwany silnik:", ENGINE, file=sys.stderr)
     sys.exit(1)
+
+print(f"✅ Zainicjalizowano silnik: {ENGINE} z modelem: {MODEL_NAME}")
 
 # ── 3. Pobranie pytania captcha ──────────────────────────────────────────────
 def banner(title: str) -> str:
@@ -113,6 +165,7 @@ def get_question(session: requests.Session, url: str) -> str:
 # ── 4. Zapytanie LLM ─────────────────────────────────────────────────────────
 def ask_llm(question: str) -> str:
     if ENGINE in {"openai", "lmstudio", "anything"}:
+        print(f"[DEBUG] Wysyłam zapytanie do {ENGINE}: {question}")
         resp = client.chat.completions.create(
             model=MODEL_NAME,
             messages=[
@@ -122,38 +175,49 @@ def ask_llm(question: str) -> str:
             temperature=0,
         )
         raw = resp.choices[0].message.content.strip()
+        print(f"[DEBUG] Otrzymana odpowiedź: {raw}")
         
-        # Liczenie tokenów (już było w oryginalnym kodzie)
+        # Liczenie tokenów
         tokens = resp.usage
         print(f"[📊 Prompt: {tokens.prompt_tokens} | Completion: {tokens.completion_tokens} | Total: {tokens.total_tokens}]")
         if ENGINE == "openai":
             cost = tokens.prompt_tokens/1_000_000*0.60 + tokens.completion_tokens/1_000_000*2.40
             print(f"[💰 Koszt OpenAI: {cost:.6f} USD]")
         elif ENGINE in {"lmstudio", "anything"}:
-            print(f"[💰 Model lokalny - brak kosztów]")
+            print(f"[💰 Model lokalny ({ENGINE}) - brak kosztów]")
         
         m = re.search(r"(\d{1,4})", raw)
         return m.group(1) if m else raw
     
     elif ENGINE == "claude":
-        resp = client.chat_completions_create(
+        print(f"[DEBUG] Wysyłam zapytanie do Claude: {question}")
+        # Claude - bezpośrednia integracja
+        resp = claude_client.messages.create(
             model=MODEL_NAME,
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user",   "content": question},
-            ],
+            messages=[{"role": "user", "content": SYSTEM_PROMPT + "\n\n" + question}],
             temperature=0,
+            max_tokens=16
         )
-        raw = resp.choices[0].message.content.strip()
+        raw = resp.content[0].text.strip()
+        print(f"[DEBUG] Otrzymana odpowiedź: {raw}")
+        
+        # Liczenie tokenów Claude
+        usage = resp.usage
+        cost = usage.input_tokens * 0.00003 + usage.output_tokens * 0.00015
+        print(f"[📊 Prompt: {usage.input_tokens} | Completion: {usage.output_tokens} | Total: {usage.input_tokens + usage.output_tokens}]")
+        print(f"[💰 Koszt Claude: {cost:.6f} USD]")
+        
         m = re.search(r"(\d{1,4})", raw)
         return m.group(1) if m else raw
     
     elif ENGINE == "gemini":
+        print(f"[DEBUG] Wysyłam zapytanie do Gemini: {question}")
         response = model_gemini.generate_content(
             [SYSTEM_PROMPT, question],
             generation_config={"temperature": 0.0, "max_output_tokens": 16}
         )
         raw = response.text.strip()
+        print(f"[DEBUG] Otrzymana odpowiedź: {raw}")
         print(f"[📊 Gemini - brak szczegółów tokenów]")
         print(f"[💰 Gemini - sprawdź limity w Google AI Studio]")
         m = re.search(r"(\d{1,4})", raw)

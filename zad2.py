@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-bot_multi.py  (multi-engine + Claude)
+S02E02 (multi-engine + Claude)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 • zgodny z openai-python ≥ 1.0
 • obsługuje backendy: openai / lmstudio / anything (LocalAI) / gemini (Google) / claude (Anthropic)
@@ -24,12 +24,11 @@ import urllib3
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 
-# Import Claude integration
+# Import Claude integration (opcjonalny)
 try:
     from claude_integration import setup_claude_for_task, add_token_counting_to_openai_call
 except ImportError:
-    print("❌ Brak claude_integration.py - skopiuj plik z artefaktu")
-    # Kontynuujemy bez Claude
+    # Kontynuujemy bez Claude - brak komunikatu o błędzie
     pass
 
 # ── 0. CLI / env - wybór silnika ─────────────────────────────────────────────
@@ -102,24 +101,35 @@ elif ENGINE == "lmstudio":
     LMSTUDIO_API_KEY = os.getenv("LMSTUDIO_API_KEY", "local")
     LMSTUDIO_API_URL = os.getenv("LMSTUDIO_API_URL", "http://localhost:1234/v1")
     MODEL_NAME = os.getenv("MODEL_NAME_LM", os.getenv("MODEL_NAME", "llama-3.3-70b-instruct"))
+    print(f"[DEBUG] LMStudio URL: {LMSTUDIO_API_URL}")
+    print(f"[DEBUG] LMStudio Model: {MODEL_NAME}")
     from openai import OpenAI
-    client = OpenAI(api_key=LMSTUDIO_API_KEY, base_url=LMSTUDIO_API_URL)
+    client = OpenAI(api_key=LMSTUDIO_API_KEY, base_url=LMSTUDIO_API_URL, timeout=60)
 
 elif ENGINE == "anything":
     ANYTHING_API_KEY = os.getenv("ANYTHING_API_KEY", "local")
     ANYTHING_API_URL = os.getenv("ANYTHING_API_URL", "http://localhost:1234/v1")
     MODEL_NAME = os.getenv("MODEL_NAME_ANY", os.getenv("MODEL_NAME", "llama-3.3-70b-instruct"))
+    print(f"[DEBUG] Anything URL: {ANYTHING_API_URL}")
+    print(f"[DEBUG] Anything Model: {MODEL_NAME}")
     from openai import OpenAI
-    client = OpenAI(api_key=ANYTHING_API_KEY, base_url=ANYTHING_API_URL)
+    client = OpenAI(api_key=ANYTHING_API_KEY, base_url=ANYTHING_API_URL, timeout=60)
 
 elif ENGINE == "claude":
-    # Inicjalizacja Claude
+    # Bezpośrednia integracja Claude (jak w zad1.py)
     try:
-        claude_client, MODEL_NAME = setup_claude_for_task(ENGINE)
-        client = claude_client
-    except:
-        print("❌ Błąd inicjalizacji Claude - sprawdź claude_integration.py i CLAUDE_API_KEY", file=sys.stderr)
+        from anthropic import Anthropic
+    except ImportError:
+        print("❌ Musisz zainstalować anthropic: pip install anthropic", file=sys.stderr)
         sys.exit(1)
+    
+    CLAUDE_API_KEY = os.getenv("CLAUDE_API_KEY") or os.getenv("ANTHROPIC_API_KEY")
+    if not CLAUDE_API_KEY:
+        print("❌ Brak CLAUDE_API_KEY lub ANTHROPIC_API_KEY w .env", file=sys.stderr)
+        sys.exit(1)
+    
+    MODEL_NAME = os.getenv("MODEL_NAME_CLAUDE", "claude-sonnet-4-20250514")
+    claude_client = Anthropic(api_key=CLAUDE_API_KEY)
 
 elif ENGINE == "gemini":
     import google.generativeai as genai
@@ -139,6 +149,7 @@ def answer_with_llm(question: str) -> str:
     lang = detect_lang(question)
     if ENGINE in {"openai", "lmstudio", "anything"}:
         try:
+            print(f"[DEBUG] Wysyłam zapytanie do {ENGINE}: {question}")
             rsp = client.chat.completions.create(
                 model=MODEL_NAME,
                 messages=[
@@ -149,6 +160,7 @@ def answer_with_llm(question: str) -> str:
                 temperature=0,
             )
             answer = rsp.choices[0].message.content.strip()
+            print(f"[DEBUG] Otrzymana odpowiedź: {answer}")
             
             # Liczenie tokenów (już było w oryginalnym kodzie)
             tokens = rsp.usage
@@ -157,7 +169,7 @@ def answer_with_llm(question: str) -> str:
                 cost = tokens.prompt_tokens/1_000_000*0.60 + tokens.completion_tokens/1_000_000*2.40
                 print(f"[💰 Koszt OpenAI: {cost:.6f} USD]")
             elif ENGINE in {"lmstudio", "anything"}:
-                print(f"[💰 Model lokalny - brak kosztów]")
+                print(f"[💰 Model lokalny ({ENGINE}) - brak kosztów]")
             return answer
         except Exception as e:
             print("[!] LLM error:", e, file=sys.stderr)
@@ -169,16 +181,22 @@ def answer_with_llm(question: str) -> str:
     
     elif ENGINE == "claude":
         try:
-            rsp = client.chat_completions_create(
+            # Claude - bezpośrednia integracja
+            resp = claude_client.messages.create(
                 model=MODEL_NAME,
-                messages=[
-                    {"role": "system", "content": SYSTEM_PROMPTS[lang]},
-                    {"role": "user",   "content": question},
-                ],
-                max_tokens=10,
+                messages=[{"role": "user", "content": SYSTEM_PROMPTS[lang] + "\n\n" + question}],
                 temperature=0,
+                max_tokens=10
             )
-            return rsp.choices[0].message.content.strip()
+            answer = resp.content[0].text.strip()
+            
+            # Liczenie tokenów Claude
+            usage = resp.usage
+            cost = usage.input_tokens * 0.00003 + usage.output_tokens * 0.00015
+            print(f"[📊 Prompt: {usage.input_tokens} | Completion: {usage.output_tokens} | Total: {usage.input_tokens + usage.output_tokens}]")
+            print(f"[💰 Koszt Claude: {cost:.6f} USD]")
+            
+            return answer
         except Exception as e:
             print("[!] Claude error:", e, file=sys.stderr)
             return {

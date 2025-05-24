@@ -4,6 +4,7 @@ import sys
 import re
 import json
 import subprocess
+import platform
 from dotenv import load_dotenv
 
 from langchain_core.tools import tool
@@ -15,7 +16,81 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 
 load_dotenv(override=True)
 
+def detect_shell_and_clean_env():
+    """
+    Wykrywa typ powłoki i czyści problematyczne zmienne środowiskowe
+    które mogłyby konfliktować z ustawieniami z .env
+    """
+    # Zmienne które mogą powodować problemy
+    problematic_vars = [
+        "LLM_ENGINE", "MODEL_NAME", "ENGINE", 
+        "OPENAI_MODEL", "CLAUDE_MODEL", "GEMINI_MODEL",
+        "AI_MODEL", "LLM_MODEL_NAME"
+    ]
+    
+    shell_type = "unknown"
+    system = platform.system().lower()
+    
+    # Wykrywanie typu powłoki
+    if system == "windows":
+        if os.getenv("PSModulePath"):  # PowerShell
+            shell_type = "powershell"
+        else:  # CMD
+            shell_type = "cmd"
+    else:  # Linux/macOS
+        shell = os.getenv("SHELL", "").lower()
+        if "bash" in shell:
+            shell_type = "bash"
+        elif "zsh" in shell:
+            shell_type = "zsh"
+        elif "fish" in shell:
+            shell_type = "fish"
+        else:
+            shell_type = "unix"
+    
+    print(f"🔍 Wykryto środowisko: {system} / {shell_type}")
+    
+    # Sprawdź problematyczne zmienne
+    found_vars = []
+    for var in problematic_vars:
+        value = os.environ.get(var)
+        if value:
+            found_vars.append((var, value))
+    
+    if found_vars:
+        print("⚠️  Znaleziono potencjalnie konfliktowe zmienne środowiskowe:")
+        for var, value in found_vars:
+            print(f"   {var} = {value}")
+        
+        # Zapytaj użytkownika czy wyczyścić
+        try:
+            response = input("❓ Wyczyścić te zmienne dla tej sesji? [y/N]: ").strip().lower()
+            if response in {'y', 'yes', 'tak', 't'}:
+                for var, _ in found_vars:
+                    del os.environ[var]
+                    print(f"🧹 Wyczyszczono: {var}")
+                
+                # Pokaż instrukcje jak wyczyścić na stałe
+                print("\n💡 Aby wyczyścić zmienne na stałe:")
+                if shell_type == "powershell":
+                    for var, _ in found_vars:
+                        print(f"   [Environment]::SetEnvironmentVariable('{var}', $null, 'User')")
+                elif shell_type in ["bash", "zsh"]:
+                    print("   Usuń odpowiednie linie z ~/.bashrc, ~/.zshrc, ~/.profile")
+                elif shell_type == "cmd":
+                    for var, _ in found_vars:
+                        print(f"   setx {var} \"\"")
+                print()
+            else:
+                print("🔄 Kontynuuję z obecnymi zmiennymi...")
+        except (EOFError, KeyboardInterrupt):
+            print("\n🔄 Kontynuuję z obecnymi zmiennymi...")
+    else:
+        print("✅ Brak konfliktowych zmiennych środowiskowych")
+
 completed_tasks = set()
+current_engine = None
+current_model = None
 
 def _execute_task(task_key: str):
     key = str(task_key).strip().strip("'").strip('"')
@@ -25,8 +100,11 @@ def _execute_task(task_key: str):
     if not os.path.exists(script):
         return (f"Plik {script} nie istnieje.", False, False)
     env = os.environ.copy()
-    if not env.get("MODEL_NAME"):
-        env["MODEL_NAME"] = env.get("MODEL_NAME_LM") or env.get("MODEL_NAME_ANY") or env.get("MODEL_NAME_GEMINI") or env.get("MODEL_NAME_OPENAI") or env.get("MODEL_NAME_CLAUDE") or ""
+    # POPRAWKA: przekazuj wybrany silnik i model do subprocess
+    if current_engine:
+        env["LLM_ENGINE"] = current_engine
+    if current_model:
+        env["MODEL_NAME"] = current_model
     if not env.get("OPENAI_API_KEY"):
         env["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY", "")
     env["PYTHONUTF8"] = "1"
@@ -128,44 +206,47 @@ def _append_to_json_log(entry: dict):
         json.dump(data, f, ensure_ascii=False, indent=4)
 
 def main():
+    global current_engine, current_model
+    
+    # Sprawdź i wyczyść problematyczne zmienne środowiskowe
+    detect_shell_and_clean_env()
+    
+    # Sprawdź aktualny ENGINE z .env (po ewentualnym wyczyszczeniu)
+    current_engine = os.getenv("LLM_ENGINE", "").lower()
+    print(f"🔍 Aktualny LLM_ENGINE z .env: '{current_engine}'")
+    
     engine = ""
-    # DODANO: claude do wyboru silników
     while engine not in {"openai", "lmstudio", "anything", "gemini", "claude"}:
         try:
-            engine = input("Wybierz silnik LLM [openai/lmstudio/anything/gemini/claude]: ").strip().lower()
+            prompt_text = f"Wybierz silnik LLM [openai/lmstudio/anything/gemini/claude]"
+            if current_engine in {"openai", "lmstudio", "anything", "gemini", "claude"}:
+                prompt_text += f" (aktualny: {current_engine})"
+            prompt_text += ": "
+            engine = input(prompt_text).strip().lower()
+            
+            # Jeśli użytkownik nie wpisał nic, użyj aktualnego ENGINE z .env
+            if not engine and current_engine in {"openai", "lmstudio", "anything", "gemini", "claude"}:
+                engine = current_engine
+                print(f"🔄 Używam silnika z .env: {engine}")
+                
         except (EOFError, KeyboardInterrupt):
             print("\nKoniec.")
             return
         if engine not in {"openai", "lmstudio", "anything", "gemini", "claude"}:
             print("⚠️ Nieznany wybór. Wpisz 'openai', 'lmstudio', 'anything', 'gemini' albo 'claude'.")
 
-    if engine == "openai":
-        os.environ["LLM_ENGINE"] = "openai"
-        os.environ["OPENAI_API_URL"] = "https://api.openai.com/v1"
-    elif engine == "claude":
-        # DODANO: obsługa Claude
-        os.environ["LLM_ENGINE"] = "claude"
-        if not os.getenv("CLAUDE_API_KEY") and not os.getenv("ANTHROPIC_API_KEY"):
-            print("⚠️ Nie ustawiono CLAUDE_API_KEY ani ANTHROPIC_API_KEY w .env - przerwano działanie.")
-            return
-    elif engine == "gemini":
-        os.environ["LLM_ENGINE"] = "gemini"
-        if not os.getenv("GEMINI_API_KEY"):
-            print("⚠️ Nie ustawiono GEMINI_API_KEY w .env - przerwano działanie.")
-            return
-        os.environ["GEMINI_API_KEY"] = os.getenv("GEMINI_API_KEY")
-    else:
-        os.environ["LLM_ENGINE"] = engine
-        os.environ["OPENAI_API_URL"] = "http://localhost:1234/v1"
-        os.environ["OPENAI_API_KEY"] = "local"
+    print(f"🚀 Wybrany silnik: {engine}")
 
+    # Ustaw globalne zmienne do przekazania subprocess
+    current_engine = engine
+
+    # Ustawienie MODEL_NAME na podstawie silnika
     if engine == "openai":
         model_name = os.getenv("MODEL_NAME_OPENAI")
         if not model_name:
             print("⚠️ Nie ustawiono MODEL_NAME_OPENAI w .env - przerwano działanie.")
             return
     elif engine == "claude":
-        # DODANO: model dla Claude
         model_name = os.getenv("MODEL_NAME_CLAUDE", "claude-sonnet-4-20250514")
     elif engine == "lmstudio":
         model_name = os.getenv("MODEL_NAME_LM", "")
@@ -175,44 +256,113 @@ def main():
             model_name = os.getenv("MODEL_NAME_OPENAI", "gpt-4o-mini")
     elif engine == "gemini":
         model_name = os.getenv("MODEL_NAME_GEMINI", "gemini-2.5-pro-latest")
-    else:
+    else:  # anything
         model_name = os.getenv("MODEL_NAME_ANY", "")
         if not model_name:
             model_name = os.getenv("MODEL_NAME_LM", "")
         if not model_name:
             model_name = os.getenv("MODEL_NAME_OPENAI", "gpt-4o-mini")
-    os.environ["MODEL_NAME"] = model_name
 
-    # DODANO: inicjalizacja LLM dla Claude
+    print(f"🔧 Model: {model_name}")
+
+    # Ustaw globalne zmienne do przekazania subprocess
+    current_model = model_name
+
+    # Debug informacji o zmiennych środowiskowych
+    print("🔍 Debug - zmienne kluczowe:")
+    if engine == "lmstudio":
+        print(f"   LMSTUDIO_API_URL: {os.getenv('LMSTUDIO_API_URL')}")
+        print(f"   LMSTUDIO_API_KEY: {os.getenv('LMSTUDIO_API_KEY')}")
+    elif engine == "anything":
+        print(f"   ANYTHING_API_URL: {os.getenv('ANYTHING_API_URL')}")
+        print(f"   ANYTHING_API_KEY: {os.getenv('ANYTHING_API_KEY')}")
+    elif engine == "claude":
+        claude_key = os.getenv("CLAUDE_API_KEY") or os.getenv("ANTHROPIC_API_KEY")
+        print(f"   CLAUDE/ANTHROPIC_API_KEY: {'✅ ustawiony' if claude_key else '❌ brak'}")
+    elif engine == "gemini":
+        print(f"   GEMINI_API_KEY: {'✅ ustawiony' if os.getenv('GEMINI_API_KEY') else '❌ brak'}")
+    elif engine == "openai":
+        print(f"   OPENAI_API_KEY: {'✅ ustawiony' if os.getenv('OPENAI_API_KEY') else '❌ brak'}")
+        print(f"   OPENAI_API_URL: {os.getenv('OPENAI_API_URL')}")
+
+    # Sprawdzenie wymaganych zmiennych przed inicjalizacją
     if engine == "claude":
-        # Claude nie jest bezpośrednio obsługiwany przez LangChain w tej wersji
-        # Używamy ChatOpenAI z custom base_url (jeśli masz proxy Claude->OpenAI)
-        # Alternatywnie możemy użyć ChatAnthropic jeśli dostępne
-        try:
-            from langchain_anthropic import ChatAnthropic
-            llm = ChatAnthropic(
-                model_name=model_name,
-                anthropic_api_key=os.getenv("CLAUDE_API_KEY") or os.getenv("ANTHROPIC_API_KEY"),
-                temperature=0
-            )
-        except ImportError:
-            print("⚠️ Brak langchain_anthropic. Zainstaluj: pip install langchain-anthropic")
-            print("Lub użyj innego silnika.")
+        if not (os.getenv("CLAUDE_API_KEY") or os.getenv("ANTHROPIC_API_KEY")):
+            print("⚠️ Nie ustawiono CLAUDE_API_KEY ani ANTHROPIC_API_KEY w .env - przerwano działanie.")
             return
     elif engine == "gemini":
-        llm = ChatGoogleGenerativeAI(
-            model=model_name,
-            google_api_key=os.getenv("GEMINI_API_KEY"),
-            temperature=0
-        )
-    else:
-        llm = ChatOpenAI(
-            model_name=model_name,
-            temperature=0,
-            openai_api_base=os.getenv("OPENAI_API_URL"),
-            openai_api_key=os.getenv("OPENAI_API_KEY")
-        )
+        if not os.getenv("GEMINI_API_KEY"):
+            print("⚠️ Nie ustawiono GEMINI_API_KEY w .env - przerwano działanie.")
+            return
+    elif engine == "openai":
+        if not os.getenv("OPENAI_API_KEY"):
+            print("⚠️ Nie ustawiono OPENAI_API_KEY w .env - przerwano działanie.")
+            return
 
+    # Ustawienie MODEL_NAME w środowisku (również dla LangChain)
+    os.environ["MODEL_NAME"] = model_name
+    os.environ["LLM_ENGINE"] = engine
+
+    # Inicjalizacja LLM - uproszczona wersja bez dodatkowych ustawień os.environ
+    try:
+        if engine == "claude":
+            try:
+                from langchain_anthropic import ChatAnthropic
+                llm = ChatAnthropic(
+                    model_name=model_name,
+                    anthropic_api_key=os.getenv("CLAUDE_API_KEY") or os.getenv("ANTHROPIC_API_KEY"),
+                    temperature=0
+                )
+                print("✅ Claude LLM zainicjalizowany")
+            except ImportError:
+                print("⚠️ Brak langchain_anthropic. Zainstaluj: pip install langchain-anthropic")
+                print("Lub użyj innego silnika.")
+                return
+                
+        elif engine == "gemini":
+            llm = ChatGoogleGenerativeAI(
+                model=model_name,
+                google_api_key=os.getenv("GEMINI_API_KEY"),
+                temperature=0
+            )
+            print("✅ Gemini LLM zainicjalizowany")
+            
+        elif engine == "lmstudio":
+            lmstudio_url = os.getenv("LMSTUDIO_API_URL", "http://localhost:1234/v1")
+            lmstudio_key = os.getenv("LMSTUDIO_API_KEY", "local")
+            llm = ChatOpenAI(
+                model_name=model_name,
+                temperature=0,
+                openai_api_base=lmstudio_url,
+                openai_api_key=lmstudio_key
+            )
+            print(f"✅ LMStudio LLM zainicjalizowany ({lmstudio_url})")
+            
+        elif engine == "anything":
+            anything_url = os.getenv("ANYTHING_API_URL", "http://localhost:1234/v1")
+            anything_key = os.getenv("ANYTHING_API_KEY", "local")
+            llm = ChatOpenAI(
+                model_name=model_name,
+                temperature=0,
+                openai_api_base=anything_url,
+                openai_api_key=anything_key
+            )
+            print(f"✅ Anything LLM zainicjalizowany ({anything_url})")
+            
+        else:  # openai
+            llm = ChatOpenAI(
+                model_name=model_name,
+                temperature=0,
+                openai_api_base=os.getenv("OPENAI_API_URL"),
+                openai_api_key=os.getenv("OPENAI_API_KEY")
+            )
+            print("✅ OpenAI LLM zainicjalizowany")
+            
+    except Exception as e:
+        print(f"❌ Błąd podczas inicjalizacji LLM: {e}")
+        return
+
+    # Konfiguracja grafu LangChain
     tools = [run_task, read_env]
     builder = StateGraph(AgentState)
     llm_with_tools = llm.bind_tools(tools)
@@ -222,7 +372,10 @@ def main():
     builder.add_conditional_edges("agent", tools_condition, {"tools": "tools", END: END})
     builder.add_edge("tools", "agent")
     graph = builder.compile()
-    print("Agent uruchomiony. Komendy: run_task N (1-10) | read_env VAR | exit")
+    
+    print("🤖 Agent uruchomiony. Komendy: run_task N (1-10) | read_env VAR | exit")
+    print("=" * 60)
+    
     while True:
         try:
             cmd = input("> ").strip()
@@ -234,6 +387,7 @@ def main():
         if cmd.lower() in {"exit", "quit"}:
             print("Wyłączam agenta.")
             break
+            
         if cmd.lower().startswith("run_task"):
             parts = cmd.split(maxsplit=1)
             if len(parts) < 2:
@@ -276,6 +430,7 @@ def main():
             else:
                 print(output)
             continue
+            
         if cmd.lower().startswith("read_env"):
             parts = cmd.split(maxsplit=1)
             if len(parts) < 2:
@@ -287,6 +442,7 @@ def main():
             value = os.getenv(var, "(niewartość)")
             print(value)
             continue
+            
         print("Nieznana komenda. Użyj: run_task N (1-10), read_env VAR, lub exit.")
 
 if __name__ == "__main__":

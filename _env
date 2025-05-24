@@ -1,6 +1,3 @@
-# Silnik LLM (domyślnie OpenAI, zmieniaj w agent.py)
-LLM_ENGINE=openai
-
 ############################################################ Anthropic ############################################################
 
 # Claude/Anthropic API
