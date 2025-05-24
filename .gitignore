@@ -4,6 +4,9 @@ venv/
 # Katalog fabryka
 fabryka/
 
+# Katalog cache
+cache/
+
 # Plik z zmiennymi środowiskowymi
 .env
 
