@@ -28,8 +28,11 @@ qdrant_storage
 # katalog neo4j_data
 neo4j_data
 
-$ katalog azyl
+# katalog azyl
 azyl
+
+# katalog vimeo
+vimeo_downloads
 
 # Inne pliki
 flags.json
