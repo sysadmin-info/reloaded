@@ -28,6 +28,9 @@ qdrant_storage
 # katalog neo4j_data
 neo4j_data
 
+$ katalog azyl
+azyl
+
 # Inne pliki
 flags.json
 secrets.json
