@@ -94,3 +94,5 @@ NEO4J_PASSWORD=YourStrongPassword
 
 # Tesseract - ustawienie lokalizacji dla ścieżki z językiem polskim
 export TESSDATA_PREFIX=/usr/share/tesseract-ocr/5/tessdata/
+
+VIMEO_URL=https://player.vimeo.com/video/xxxxxxxxxx?h=xxxxxxxxxx
