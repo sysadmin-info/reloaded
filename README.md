@@ -287,6 +287,20 @@ QDRANT_API_KEY=your_qdrant_key
 
 Kod automatycznie wykryje konfigurację i pokaże odpowiednie komunikaty. Jeśli połączenie z Dockerem nie działa, dostaniesz pomocne wskazówki.
 
+# Zadanie 14 - zad14.py
+
+Zainstaluj Docker, zainstaluj kontener z neo4j
+
+```bash
+docker run -d   --name neo4j   -p 7474:7474 -p 7687:7687   -v $HOME/neo4j/data:/data   -v $HOME/neo4j/logs:/logs   -v $HOME/neo4j/import:/import   -v $HOME/neo4j/plugins:/plugins   -e NEO4J_AUTH=neo4j/YourStrongPassword123   neo4j:5
+```
+
+Zainstaluj neo4j
+
+```bash
+pip install neo4j
+```
+
 ---
 # English version
 
@@ -592,3 +606,17 @@ QDRANT_API_KEY=your_qdrant_key
 
 The code will automatically detect the configuration and display appropriate messages.
 If the Docker connection fails, you’ll get helpful diagnostics.
+
+# Task 14 - zad14.py
+
+Install Docker, install container with neo4j
+
+```bash
+docker run -d   --name neo4j   -p 7474:7474 -p 7687:7687   -v $HOME/neo4j/data:/data   -v $HOME/neo4j/logs:/logs   -v $HOME/neo4j/import:/import   -v $HOME/neo4j/plugins:/plugins   -e NEO4J_AUTH=neo4j/YourStrongPassword123   neo4j:5
+```
+
+Install neo4j
+
+```bash
+pip install neo4j
+```
