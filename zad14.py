@@ -3,6 +3,41 @@
 S03E05 - Znajdowanie najkrótszej ścieżki od Rafała do Barbary
 Multi-engine: openai, lmstudio, anything, gemini, claude
 Wykorzystuje bazę MySQL i Neo4j do analizy połączeń między osobami
+
+### 1. **Prosty, czysty model danych**
+```cypher
+// Węzły: User z userId i name
+CREATE (u:User {userId: 17, name: "Rafał"})
+
+// Relacje: jednostronna KNOWS
+CREATE (u1)-[:KNOWS]->(u2)
+```
+
+### 2. **Cypher robi całą robotę**
+```cypher
+MATCH (start:User {name: "Rafał"}), (end:User {name: "Barbara"}),
+      path = shortestPath((start)-[:KNOWS*]->(end))
+RETURN [n in nodes(path) | n.name] AS names
+```
+Neo4j automatycznie znajduje najkrótszą ścieżkę używając algorytmu BFS (Breadth-First Search).
+
+### 3. **Dane z MySQL są kompletne**
+- Tabela `connections` zawiera wszystkie potrzebne relacje
+- Graf jest skierowany (user1_id → user2_id)
+- Istnieje ścieżka: Rafał → ktoś → ktoś → Barbara
+
+### 4. **LangGraph zapewnia porządek**
+```
+START → fetch_users → fetch_connections → create_graph → find_path → send_answer → END
+```
+Każdy krok jest niezależny i testowalny.
+
+## Co się dzieje "pod maską":
+1. **MySQL** → dostarcza surowe dane (users + connections)
+2. **Neo4j** → buduje graf i znajduje optymalną ścieżkę
+3. **Python** → tylko orkiestruje proces
+
+**Fun fact**: Neo4j jest tak dobry w grafach, że `shortestPath()` to dla niego podstawowa operacja - jak `SELECT` dla SQL. 
 """
 import argparse
 import os
