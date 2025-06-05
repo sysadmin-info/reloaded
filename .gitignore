@@ -1,0 +1,47 @@
+# Wirtualne środowisko
+venv/
+
+# Katalog fabryka
+fabryka/
+fabryka_data
+
+# Katalog cache
+cache/
+
+# Plik z zmiennymi środowiskowymi
+.env
+
+# Katalog debug
+debug/
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+
+# Logi i tymczasowe
+*.log
+*.tmp
+
+# katalog dla Qdrant
+qdrant_storage
+
+# katalog neo4j_data
+neo4j_data
+
+# katalog azyl
+azyl
+
+# katalog vimeo
+vimeo_downloads
+
+# lab data
+lab_data
+
+# Inne pliki
+flags.json
+secrets.json
+payload.json
+raw_classification.json
+wynik.json
+.cache_context.json
+zad23.py
