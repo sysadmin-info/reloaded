@@ -1,4 +1,4 @@
-############################################################ Anthropic ############################################################
+# === Anthropic ===
 
 # Claude/Anthropic API
 CLAUDE_API_KEY=sk-ant-api03-twój_klucz_claude_tutaj
@@ -8,8 +8,7 @@ CLAUDE_API_KEY=sk-ant-api03-twój_klucz_claude_tutaj
 # Model Claude
 MODEL_NAME_CLAUDE=claude-sonnet-4-20250514
 
-############################################################ OpenAI ############################################################
-
+# === OpenAI ===
 # OpenAI API
 OPENAI_API_KEY=sk-proj-twój_klucz_openai_tutaj
 OPENAI_API_URL=https://api.openai.com/v1
@@ -26,15 +25,13 @@ MODEL_NAME_VISION=gpt-4o
 # Model do transkrypcji dźwięku na tekst
 WHISPER_MODEL=base
 
-############################################################ Alphabet / Gemini ############################################################
-
+# === Alphabet / Gemini ===
 # Gemini / Google API
 GEMINI_API_KEY=twój_klucz_gemini_tutaj
 MODEL_NAME_GEMINI=gemini-1.5-pro-latest
 MODEL_NAME_GEMINI_IMAGE=gemini-2.0-flash
 
-############################################################ Local Models ############################################################
-
+# === Local models ===
 # Model dla chatu
 MODEL_NAME_LM=qwen2.5-3b-instruct
 MODEL_NAME_ANY=qwen2.5-3b-instruct
@@ -55,8 +52,7 @@ ANYTHING_MODEL_EMBED=text-embedding-nomic-embed-text-v1.5
 
 LOCAL_SD_API_URL=http://localhost:8074
 
-############################################################ AI Devs 3 variables ############################################################
-
+# === AI Devs 3 variables ===
 CENTRALA_API_KEY=Twój_klucz_z_centrali
 REPORT_URL=https://xxx.xxx.xxx/report
 ROBOT_LOGIN_URL=https://xyz.xxx.xxx/
@@ -78,24 +74,27 @@ BARBARA_NOTE_URL=https://xxx.xxx.xxx/dane/barbara.txt
 NA_SMARTFONA_URL=https://xxx.xxx.xxx/dane/na_smartfona.txt
 LAB_DATA_URL=https://xxx.xxx.xxx/dane/lab_data.zip
 SOFTO_URL=https://xxx.xxx.xxx
-SOFTO_QUESTIONS_URL=https://xxx.xxx.xxx/data/Twój_klucz_z_centrali/softo.json"
+SOFTO_QUESTIONS_URL=https://xxx.xxx.xxx/data/Twój_klucz_z_centrali/softo.json
 
-############################################################ Qdrant variables ############################################################
+# === Qdrant variables ===
 
 QDRANT_HOST=localhost # you can use IP address instead of localhost
 QDRANT_PORT=6333
 #QDRANT_URL=https://xyz.qdrant.io
 #QDRANT_API_KEY=your_qdrant_key
 
-############################################################ neo4j variables ############################################################
-
+# === neo4j variables ===
 NEO4J_URI=bolt://localhost:7687
 NEO4J_USER=neo4j
 NEO4J_PASSWORD=YourStrongPassword
 
-############################################################ OCR ############################################################
-
+# === OCR ===
 # Tesseract - ustawienie lokalizacji dla ścieżki z językiem polskim
 export TESSDATA_PREFIX=/usr/share/tesseract-ocr/5/tessdata/
 
+# === VIDEO ===
 VIMEO_URL=https://player.vimeo.com/video/xxxxxxxxxx?h=xxxxxxxxxx
+
+# === OPCJE DEBUGOWANIA ===
+# Pokazuj szczegółowe logi myślenia LLM
+DEBUG_THINKING=true
