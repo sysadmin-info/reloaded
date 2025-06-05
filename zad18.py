@@ -91,6 +91,24 @@ elif ENGINE == "anything":
 print(f"✅ Model: {MODEL_NAME}")
 
 # 2. Inicjalizacja klienta LLM
+def clean_llm_response(response: str) -> str:
+    """Czyści odpowiedź LLM z tagów myślenia używanych przez modele lokalne"""
+    # Usuń tagi <think>...</think>
+    response = re.sub(r'<think>.*?</think>', '', response, flags=re.DOTALL)
+    
+    # Usuń tagi <thinking>...</thinking>
+    response = re.sub(r'<thinking>.*?</thinking>', '', response, flags=re.DOTALL)
+    
+    # Usuń tagi myślenia w innych formatach
+    response = re.sub(r'<thought>.*?</thought>', '', response, flags=re.DOTALL)
+    response = re.sub(r'\[THOUGHT\].*?\[/THOUGHT\]', '', response, flags=re.DOTALL)
+    response = re.sub(r'\[THINKING\].*?\[/THINKING\]', '', response, flags=re.DOTALL)
+    
+    # Usuń nadmiarowe białe znaki
+    response = re.sub(r'\n\s*\n', '\n', response)
+    
+    return response.strip()
+
 def call_llm(prompt: str, temperature: float = 0) -> str:
     """Uniwersalna funkcja wywołania LLM"""
     
@@ -105,8 +123,8 @@ def call_llm(prompt: str, temperature: float = 0) -> str:
             messages=[{"role": "user", "content": prompt}],
             temperature=temperature
         )
-        return resp.choices[0].message.content.strip()
-    
+        response = resp.choices[0].message.content.strip()
+        
     elif ENGINE == "claude":
         try:
             from anthropic import Anthropic
@@ -121,8 +139,8 @@ def call_llm(prompt: str, temperature: float = 0) -> str:
             temperature=temperature,
             max_tokens=1000
         )
-        return resp.content[0].text.strip()
-    
+        response = resp.content[0].text.strip()
+        
     elif ENGINE in {"lmstudio", "anything"}:
         from openai import OpenAI
         base_url = os.getenv("LMSTUDIO_API_URL", "http://localhost:1234/v1") if ENGINE == "lmstudio" else os.getenv("ANYTHING_API_URL", "http://localhost:1234/v1")
@@ -134,17 +152,23 @@ def call_llm(prompt: str, temperature: float = 0) -> str:
             messages=[{"role": "user", "content": prompt}],
             temperature=temperature
         )
-        return resp.choices[0].message.content.strip()
-    
+        response = resp.choices[0].message.content.strip()
+        
     elif ENGINE == "gemini":
         import google.generativeai as genai
         genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
         model = genai.GenerativeModel(MODEL_NAME)
-        response = model.generate_content(
+        resp = model.generate_content(
             [prompt],
             generation_config={"temperature": temperature, "max_output_tokens": 1000}
         )
-        return response.text.strip()
+        response = resp.text.strip()
+    
+    # Wyczyść odpowiedź z tagów myślenia (szczególnie dla modeli lokalnych)
+    if ENGINE in {"lmstudio", "anything"}:
+        response = clean_llm_response(response)
+    
+    return response
 
 # 3. Mapa i logika drona (skopiowane z drone_navigation_langgraph.py)
 MAP = [
