@@ -421,6 +421,12 @@ Kod automatycznie:
 
 # Sekret 7
 
+Zainstaluj matplotlib
+
+```bash
+   pip install matplotlib
+```
+
 Uruchom plik:
 
 ```bash
@@ -868,6 +874,12 @@ The code will automatically:
 * Submit the correct answers
 
 # Secret 7
+
+Install matplotlib
+
+```bash
+   pip install matplotlib
+```
 
 Run the file:
 
