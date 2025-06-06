@@ -372,7 +372,7 @@ wybierz silnik i wpisz: `run_task 17` lub `run_secret 6`.
 
 # Zadanie 18
 
-Przeczytaj plik README_WEBHOOK_PL.md
+Przeczytaj plik README_WEBHOOK_PL.md Zalecam model: qwen3-asteria-14b-128k dla LM Studio i Anything LLM.
 
 ---
 # English version
@@ -764,4 +764,4 @@ select the engine and type: `run_task 17` or `run_secret 6`.
 
 # Task 18
 
-Read the README_WEBHOOK_EN.md file.
+Read the README_WEBHOOK_EN.md file. I recommend model: qwen3-asteria-14b-128k dfor LM Studio and Anything LLM.
