@@ -93,19 +93,30 @@ print(f"✅ Model: {MODEL_NAME}")
 # 2. Inicjalizacja klienta LLM
 def clean_llm_response(response: str) -> str:
     """Czyści odpowiedź LLM z tagów myślenia używanych przez modele lokalne"""
-    # Usuń tagi <think>...</think>
-    response = re.sub(r'<think>.*?</think>', '', response, flags=re.DOTALL)
+    # Usuń tagi <think>...</think> (nawet jeśli niedomknięte)
+    response = re.sub(r'<think>.*?(?:</think>|$)', '', response, flags=re.DOTALL | re.IGNORECASE)
     
     # Usuń tagi <thinking>...</thinking>
-    response = re.sub(r'<thinking>.*?</thinking>', '', response, flags=re.DOTALL)
+    response = re.sub(r'<thinking>.*?(?:</thinking>|$)', '', response, flags=re.DOTALL | re.IGNORECASE)
     
     # Usuń tagi myślenia w innych formatach
-    response = re.sub(r'<thought>.*?</thought>', '', response, flags=re.DOTALL)
-    response = re.sub(r'\[THOUGHT\].*?\[/THOUGHT\]', '', response, flags=re.DOTALL)
-    response = re.sub(r'\[THINKING\].*?\[/THINKING\]', '', response, flags=re.DOTALL)
+    response = re.sub(r'<thought>.*?(?:</thought>|$)', '', response, flags=re.DOTALL | re.IGNORECASE)
+    response = re.sub(r'\[THOUGHT\].*?(?:\[/THOUGHT\]|$)', '', response, flags=re.DOTALL | re.IGNORECASE)
+    response = re.sub(r'\[THINKING\].*?(?:\[/THINKING\]|$)', '', response, flags=re.DOTALL | re.IGNORECASE)
+    
+    # Usuń linie zaczynające się od myślenia
+    lines = response.split('\n')
+    cleaned_lines = []
+    for line in lines:
+        line = line.strip()
+        if not any(word in line.lower() for word in ['<think', 'okay', 'let me', 'breaking', 'analysis']):
+            cleaned_lines.append(line)
+    
+    response = '\n'.join(cleaned_lines)
     
     # Usuń nadmiarowe białe znaki
     response = re.sub(r'\n\s*\n', '\n', response)
+    response = re.sub(r'\s+', ' ', response)
     
     return response.strip()
 
@@ -147,10 +158,17 @@ def call_llm(prompt: str, temperature: float = 0) -> str:
         api_key = os.getenv("LMSTUDIO_API_KEY", "local") if ENGINE == "lmstudio" else os.getenv("ANYTHING_API_KEY", "local")
         
         client = OpenAI(api_key=api_key, base_url=base_url)
+        
+        # Optymalizacje dla modeli lokalnych z większymi tokenami
         resp = client.chat.completions.create(
             model=MODEL_NAME,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=temperature
+            messages=[
+                {"role": "system", "content": "You are a precise assistant. Give very short, direct answers. No thinking tags."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=temperature,
+            max_tokens=200,  # Więcej tokenów na bezpieczeństwo
+            timeout=15.0   # 15 sekund timeout
         )
         response = resp.choices[0].message.content.strip()
         
@@ -200,7 +218,26 @@ def parse_instruction_node(state: NavigationState) -> NavigationState:
     """Parsuje instrukcję na listę ruchów"""
     instruction = state["instruction"].lower()
     
-    prompt = f"""Przeanalizuj poniższą instrukcję lotu drona i wypisz TYLKO listę ruchów.
+    # Optymalizowany prompt dla modeli lokalnych
+    if ENGINE in {"lmstudio", "anything"}:
+        prompt = f"""Parse this Polish drone instruction to movement commands.
+
+Instruction: "{instruction}"
+
+Map: 4x4 grid. Drone moves: RIGHT, LEFT, UP, DOWN.
+
+Key phrases:
+- "maksymalnie w prawo" = RIGHT, RIGHT, RIGHT (3 moves to edge)
+- "na sam dół" = DOWN, DOWN, DOWN (3 moves to edge)  
+- "albo nie!", "czekaj" = CANCEL previous commands
+- Follow order: "right then down" means RIGHT first, then DOWN
+
+Return only comma-separated movements like: RIGHT, RIGHT, DOWN
+If no movement: NONE
+
+Answer:"""
+    else:
+        prompt = f"""Przeanalizuj poniższą instrukcję lotu drona i wypisz TYLKO listę ruchów.
 Dron może się poruszać: PRAWO, LEWO, GÓRA, DÓŁ.
 Mapa ma wymiary 4x4.
 
@@ -216,17 +253,80 @@ Ważne wskazówki:
 Zwróć TYLKO listę ruchów oddzielonych przecinkami, np: PRAWO, PRAWO, DÓŁ
 Jeśli nie ma żadnych ruchów, zwróć: BRAK"""
     
-    movements_str = call_llm(prompt)
-    state["thinking"] = f"LLM response: {movements_str}"
+    # Pomiar czasu dla debug
+    start_time = time.time()
+    logger.info(f"🤖 Wysyłam do {ENGINE}: {instruction[:50]}...")
     
-    # Parsuj ruchy
-    if movements_str.strip().upper() == "BRAK":
+    try:
+        movements_str = call_llm(prompt)
+    except Exception as e:
+        logger.error(f"❌ Błąd LLM: {e}")
+        # Fallback - spróbuj podstawowego parsowania
+        movements_str = basic_instruction_parser(instruction)
+        logger.info(f"🔄 Używam fallback parsera: {movements_str}")
+    
+    end_time = time.time()
+    logger.info(f"⏱️  LLM odpowiedział w {end_time - start_time:.2f}s")
+    logger.info(f"📤 Surowa odpowiedź: {repr(movements_str)}")
+    
+    state["thinking"] = f"LLM response ({end_time - start_time:.2f}s): {movements_str}"
+    
+    # Parsuj ruchy - obsługa różnych formatów odpowiedzi
+    movements_str_upper = movements_str.strip().upper()
+    if movements_str_upper in ["BRAK", "NONE", "NO MOVES", ""]:
         state["movements"] = []
+        logger.info("🚫 Brak ruchów")
     else:
+        # Zamień angielskie na polskie dla spójności
+        movements_str = movements_str.replace("RIGHT", "PRAWO")
+        movements_str = movements_str.replace("LEFT", "LEWO") 
+        movements_str = movements_str.replace("UP", "GÓRA")
+        movements_str = movements_str.replace("DOWN", "DÓŁ")
+        
         movements = [m.strip().upper() for m in movements_str.split(",") if m.strip()]
-        state["movements"] = movements
+        # Filtruj tylko poprawne ruchy
+        valid_movements = [m for m in movements if m in ["PRAWO", "LEWO", "GÓRA", "DÓŁ"]]
+        state["movements"] = valid_movements
+        logger.info(f"🎯 Ruchy: {valid_movements}")
     
     return state
+
+def basic_instruction_parser(instruction: str) -> str:
+    """Podstawowy parser instrukcji jako fallback"""
+    instruction = instruction.lower()
+    
+    # Sprawdź anulowanie
+    if any(word in instruction for word in ["albo nie", "czekaj", "nie idziemy", "stop"]):
+        # Sprawdź co jest po anulowaniu
+        parts = re.split(r"albo nie|czekaj|nie idziemy|stop", instruction)
+        if len(parts) > 1:
+            instruction = parts[-1]  # Bierz ostatnią część
+        else:
+            return "NONE"
+    
+    movements = []
+    
+    # Maksymalne ruchy
+    if "maksymalnie w prawo" in instruction or "na maksa w prawo" in instruction:
+        movements.extend(["RIGHT", "RIGHT", "RIGHT"])
+    elif "maksymalnie w lewo" in instruction or "na maksa w lewo" in instruction:
+        movements.extend(["LEFT", "LEFT", "LEFT"])
+    elif "na sam dół" in instruction or "maksymalnie w dół" in instruction:
+        movements.extend(["DOWN", "DOWN", "DOWN"])
+    elif "na sam góra" in instruction or "maksymalnie w górę" in instruction:
+        movements.extend(["UP", "UP", "UP"])
+    
+    # Pojedyncze ruchy
+    if "w prawo" in instruction and "maksymalnie" not in instruction:
+        movements.append("RIGHT")
+    if "w lewo" in instruction and "maksymalnie" not in instruction:
+        movements.append("LEFT")
+    if "w dół" in instruction and "sam dół" not in instruction:
+        movements.append("DOWN")
+    if "w górę" in instruction or "do góry" in instruction:
+        movements.append("UP")
+    
+    return ", ".join(movements) if movements else "NONE"
 
 def execute_movements_node(state: NavigationState) -> NavigationState:
     """Wykonuje ruchy i znajduje końcową pozycję"""
