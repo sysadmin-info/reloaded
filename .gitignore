@@ -1,5 +1,6 @@
 # Wirtualne środowisko
 venv/
+dev-venv/
 
 # Plik z zmiennymi środowiskowymi
 .env
