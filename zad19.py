@@ -412,9 +412,23 @@ def answer_questions(content: str, questions: Dict[str, str], hints: Dict[str, s
 """
         elif q_id == "05":
             special_instructions = """
-- Odpowiedzi należy szukać na stronie 19, gdzie tekst jest odręczny i może być podzielony/nieczytelny przez OCR. 
-- Wskazówka: miejscowość leży niedaleko Grudziądza, jest związana z historią AIDevs, a jej nazwa może być rozbita na fragmenty na obrazku. Najprawdopodobniej to Lubawa.
-- Odpowiedz nazwą miejscowości, do której Rafał chce się dostać po spotkaniu z Andrzejem."""
+Strona 19 notatnika zawiera bardzo nieczytelny tekst, OCR zwrócił tylko fragmenty liter, np.:
+
+Lezy ef a tabi,
+z "A Ras rażię
+I KAC SE
+ło fy w
+godzi
+WAŻY
+[...]
+
+Wiadomo, że szukana nazwa miejscowości:
+- leży w okolicy Grudziądza (woj. kujawsko-pomorskie),
+- zaczyna się na "L", kończy na "a",
+- w środku są litery "b", "w", "a".
+
+Podaj najbardziej prawdopodobną nazwę tej miejscowości (tylko nazwę, bez wyjaśnień).
+"""
         
         prompt = f"""Analizuję notatnik Rafała i odpowiadam na pytanie.
 
