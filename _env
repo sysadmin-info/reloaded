@@ -37,7 +37,8 @@ MODEL_NAME_LM=qwen2.5-3b-instruct
 MODEL_NAME_ANY=qwen2.5-3b-instruct
 
 # Model do ropoznawania obrazów
-MODEL_NAME_VISION_LM=llama-3.3-70b-instruct
+MODEL_NAME_VISION_LM=llava-v1.5-7b
+MODEL_NAME_VISION_ANY=llava-v1.5-7b
 
 # Model do transkrypcji dźwięku na tekst
 TRANSCRIBE_API_URL=http://localhost:1234/v1

@@ -1,18 +1,8 @@
 # Wirtualne środowisko
 venv/
 
-# Katalog fabryka
-fabryka/
-fabryka_data
-
-# Katalog cache
-cache/
-
 # Plik z zmiennymi środowiskowymi
 .env
-
-# Katalog debug
-debug/
 
 # Python bytecode
 __pycache__/
@@ -22,20 +12,17 @@ __pycache__/
 *.log
 *.tmp
 
-# katalog dla Qdrant
+# katalogi
+cache
+debug
+fabryka
+fabryka_data
 qdrant_storage
-
-# katalog neo4j_data
 neo4j_data
-
-# katalog azyl
 azyl
-
-# katalog vimeo
 vimeo_downloads
-
-# lab data
 lab_data
+notatnik_data
 
 # Inne pliki
 flags.json

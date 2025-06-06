@@ -374,7 +374,53 @@ wybierz silnik i wpisz: `run_task 17` lub `run_secret 6`.
 
 Przeczytaj plik README_WEBHOOK_PL.md Zalecam model: qwen3-asteria-14b-128k dla LM Studio i Anything LLM.
 
+# Zadanie 19
+
+## Kluczowe funkcjonalności:
+
+1. **Multi-engine support** - zgodnie z pozostałymi plikami `zad*.py`:
+   - OpenAI, Claude, Gemini, LMStudio, Anything
+   - Automatyczne wykrywanie silnika
+   - Vision models do OCR zamiast Tesseract
+
+2. **Pipeline z LangGraph**:
+   - `download_pdf_node` - pobiera PDF z notatnikiem
+   - `extract_content_node` - ekstraktuje tekst ze stron 1-18
+   - `ocr_page19_node` - wykonuje OCR na stronie 19 (obraz)
+   - `fetch_questions_node` - pobiera pytania z API
+   - `answer_questions_node` - generuje odpowiedzi używając LLM
+   - `send_answers_node` - wysyła i obsługuje hinty
+
+3. **Inteligentne odpowiadanie**:
+   - Używa pełnego kontekstu notatnika
+   - Obsługuje hinty z centrali (iteracyjne poprawianie)
+   - Formatuje daty jako YYYY-MM-DD
+   - Krótkie, konkretne odpowiedzi
+
+4. **Wymagana instalacja pakietów**:
+
+```bash
+pip install frontend
+pip install PyMuPDF
+pip install Pillow
+```
+
+## Uruchomienie:
+```bash
+python zad19.py --engine openai
+# Zamiast openai wybierz inny silnik
+```
+
+Kod automatycznie:
+- Pobierze PDF z notatnikiem
+- Przetworzy strony 1-18 jako tekst
+- Wykona OCR na stronie 19
+- Odpowie na pytania używając LLM
+- Obsłuży ewentualne hinty z centrali
+- Wyśle poprawne odpowiedzi
+
 ---
+
 # English version
 
 AI Devs 3 Reloaded tasks in Python and LangGraph and other tools
@@ -765,3 +811,50 @@ select the engine and type: `run_task 17` or `run_secret 6`.
 # Task 18
 
 Read the README_WEBHOOK_EN.md file. I recommend model: qwen3-asteria-14b-128k dfor LM Studio and Anything LLM.
+
+# Task 19
+
+## Key functionalities:
+
+1. **Multi-engine support** – in line with other `zad*.py` files:
+   - OpenAI, Claude, Gemini, LMStudio, Anything
+   - Automatic engine detection
+   - Vision models for OCR instead of Tesseract
+
+2. **Pipeline using LangGraph**:
+   - `download_pdf_node` – downloads the notebook PDF
+   - `extract_content_node` – extracts text from pages 1-18
+   - `ocr_page19_node` – performs OCR on page 19 (image)
+   - `fetch_questions_node` – fetches questions from the API
+   - `answer_questions_node` – generates answers using LLM
+   - `send_answers_node` – submits answers and handles hints
+
+3. **Intelligent answering**:
+   - Uses the full context of the notebook
+   - Handles hints from the central system (iterative corrections)
+   - Formats dates as YYYY-MM-DD
+   - Short, concise answers
+
+4. **Required package installation**:
+
+```bash
+pip install frontend
+pip install PyMuPDF
+pip install Pillow
+````
+
+## Execution:
+
+```bash
+python zad19.py --engine openai
+# Replace "openai" with a different engine as needed
+```
+
+The code will automatically:
+
+* Download the notebook PDF
+* Process pages 1-18 as text
+* Perform OCR on page 19
+* Answer questions using the LLM
+* Handle any hints from the central system
+* Submit the correct answers
