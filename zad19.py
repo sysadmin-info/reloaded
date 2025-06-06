@@ -443,24 +443,31 @@ def answer_questions(content: str, questions: Dict[str, str], hints: Dict[str, s
         
         if q_id == "01":
             special_instructions = """
-- Odpowiedź nie jest podana wprost. Oblicz, do którego roku Rafał musiał się przenieść.
-- GPT-2 został publicznie wydany w lutym 2019 roku.
-- Odpowiedź to czterocyfrowy rok: 2019"""
+- Odpowiedź nie jest podana wprost. Oblicz, do którego roku Rafał musiał się przenieść, aby być świadkiem powstania modelu GPT-2 i rozpocząć pracę nad LLM przed jego powstaniem.
+- GPT-2 został publicznie wydany w lutym 2019 roku. Adam wybrał rok, w którym miały się zacząć prace nad LLM, czyli rok 2019.
+- Odpowiedź to czterocyfrowy rok."""
         elif q_id == "02":
             special_instructions = """
 - Szukaj imienia osoby która wpadła na pomysł podróży w czasie
-- To będzie pojedyncze imię: Adam"""
+- To będzie pojedyncze imię, prawdopodobnie męskie"""
         elif q_id == "03":
             special_instructions = """
-- Szukaj miejsca schronienia Rafała.
-- Odpowiedź to jedno słowo: jaskinia
-- NIE podawaj lokalizacji, tylko typ miejsca."""
+- Szukaj miejsca schronienia Rafała. Odpowiedź to jedno słowo.
+- NIE podawaj lokalizacji, tylko typ miejsca (jaskinia).
+- Odpowiedź musi być jednym słowem.
+"""
         elif q_id == "05":
             special_instructions = """
-- Szukaj nazwy miejscowości na stronie 19 (w sekcji OCR)
-- Miejscowość leży w okolicy Grudziądza
-- Prawidłowa nazwa to: Lubawa (NIE Lupana)"""
-        
+Strona 19 notatnika zawiera bardzo nieczytelny tekst, OCR zwrócił tylko fragmenty liter.
+
+Wiadomo, że szukana nazwa miejscowości:
+- leży w okolicy Grudziądza (woj. kujawsko-pomorskie),
+- nie ma litery ł ani Ł w nazwie,
+- zaczyna się na "L", kończy na "a",
+- w środku są litery "b", "w", "a".
+
+Podaj najbardziej prawdopodobną nazwę tej miejscowości (tylko nazwę, bez wyjaśnień).
+"""
         prompt = f"""Analizuję notatnik Rafała i odpowiadam na pytanie.
 
 NOTATNIK:
@@ -575,7 +582,7 @@ def ocr_page19_node(state: PipelineState) -> PipelineState:
                 logger.info("💡 Możesz ręcznie podać tekst używając: --page19-text 'treść strony'")
                 logger.info("💡 Lub użyj wyższej rozdzielczości: --high-res")
     
-    logger.info(f"📄 Tekst ze strony 19 (pierwsze 5000 znaków):\n{page19_text[:5000]}...")
+    logger.info(f"📄 Tekst ze strony 19 (pierwsze 500 znaków):\n{page19_text[:500]}...")
     
     state["page19_text"] = page19_text
     
