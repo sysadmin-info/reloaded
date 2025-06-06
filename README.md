@@ -419,6 +419,14 @@ Kod automatycznie:
 - Obsłuży ewentualne hinty z centrali
 - Wyśle poprawne odpowiedzi
 
+# Sekret 7
+
+Uruchom plik:
+
+```bash
+   python sec7.py
+```
+
 ---
 
 # English version
@@ -858,3 +866,11 @@ The code will automatically:
 * Answer questions using the LLM
 * Handle any hints from the central system
 * Submit the correct answers
+
+# Secret 7
+
+Run the file:
+
+```bash
+   python sec7.py
+```
