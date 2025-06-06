@@ -95,8 +95,8 @@ current_model = None
 
 def _execute_task(task_key: str):
     key = str(task_key).strip().strip("'").strip('"')
-    if key not in {"1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18"}:
-        return ("Niepoprawny numer zadania. Wybierz w zakresie 1-18.", False, False)
+    if key not in {"1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19"}:
+        return ("Niepoprawny numer zadania. Wybierz w zakresie 1-19.", False, False)
     script = f"zad{key}.py"
     if not os.path.exists(script):
         return (f"Plik {script} nie istnieje.", False, False)
@@ -141,8 +141,8 @@ def _execute_task(task_key: str):
 def _execute_secret(secret_key: str):
     """NOWE: Wykonuje sekretne zadanie secN.py"""
     key = str(secret_key).strip().strip("'").strip('"')
-    if key not in {"1", "2", "3", "4", "5", "6"}:
-        return ("Niepoprawny numer sekretu. Wybierz w zakresie 1-6.", False, False)
+    if key not in {"1", "2", "3", "4", "5", "6", "7"}:
+        return ("Niepoprawny numer sekretu. Wybierz w zakresie 1-7.", False, False)
     script = f"sec{key}.py"
     if not os.path.exists(script):
         return (f"Plik {script} nie istnieje.", False, False)
@@ -189,7 +189,7 @@ def run_task(task_key: str) -> str:
     """
     Uruchamia zadanie zadN.py (gdzie N to numer zadania) i zwraca wynik działania,
     w szczególności flagę w formacie {{FLG:...}}. Używany przez agenta LangChain.
-    Obsługuje zadania 1-18.
+    Obsługuje zadania 1-19.
     """
     key = str(task_key).strip().strip("'").strip('"')
     print(f"🔄 Uruchamiam zadanie {key}…")
@@ -229,7 +229,7 @@ def run_secret(secret_key: str) -> str:
     """
     NOWE: Uruchamia sekretne zadanie secN.py (gdzie N to numer sekretu) i zwraca wynik działania,
     w szczególności flagę w formacie {{FLG:...}}. Używany przez agenta LangChain.
-    Obsługuje sekrety 1-6.
+    Obsługuje sekrety 1-7.
     """
     key = str(secret_key).strip().strip("'").strip('"')
     print(f"🔐 Uruchamiam sekret {key}…")
@@ -462,7 +462,7 @@ def main():
     builder.add_edge("tools", "agent")
     graph = builder.compile()
     
-    print("🤖 Agent uruchomiony. Komendy: run_task N (1-18) | run_secret N (1-6) | read_env VAR | exit")
+    print("🤖 Agent uruchomiony. Komendy: run_task N (1-19) | run_secret N (1-7) | read_env VAR | exit")
     print("=" * 60)
     
     while True:
@@ -480,13 +480,13 @@ def main():
         if cmd.lower().startswith("run_task"):
             parts = cmd.split(maxsplit=1)
             if len(parts) < 2:
-                print("Niepoprawny numer zadania. Wybierz w zakresie 1-18.")
+                print("Niepoprawny numer zadania. Wybierz w zakresie 1-19.")
                 continue
             task_arg = parts[1].strip()
             if (task_arg.startswith("'") and task_arg.endswith("'")) or (task_arg.startswith('"') and task_arg.endswith('"')):
                 task_arg = task_arg[1:-1].strip()
-            if task_arg not in {"1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18"}:
-                print("Niepoprawny numer zadania. Wybierz w zakresie 1-18.")
+            if task_arg not in {"1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19"}:
+                print("Niepoprawny numer zadania. Wybierz w zakresie 1-19.")
                 continue
             task_id = task_arg
             print(f"🔄 Uruchamiam zadanie {task_id}…")
@@ -529,8 +529,8 @@ def main():
             secret_arg = parts[1].strip()
             if (secret_arg.startswith("'") and secret_arg.endswith("'")) or (secret_arg.startswith('"') and secret_arg.endswith('"')):
                 secret_arg = secret_arg[1:-1].strip()
-            if secret_arg not in {"1", "2", "3", "4", "5", "6"}:
-                print("Niepoprawny numer sekretu. Wybierz w zakresie 1-6.")
+            if secret_arg not in {"1", "2", "3", "4", "5", "6", "7"}:
+                print("Niepoprawny numer sekretu. Wybierz w zakresie 1-7.")
                 continue
             secret_id = secret_arg
             print(f"🔐 Uruchamiam sekret {secret_id}…")
@@ -576,7 +576,7 @@ def main():
             print(value)
             continue
             
-        print("Nieznana komenda. Użyj: run_task N (1-18), run_secret N (1-6), read_env VAR, lub exit.")
+        print("Nieznana komenda. Użyj: run_task N (1-19), run_secret N (1-7), read_env VAR, lub exit.")
 
 if __name__ == "__main__":
     main()
