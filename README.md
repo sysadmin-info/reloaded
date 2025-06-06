@@ -46,7 +46,7 @@ cd reloaded
 mkdir venv
 python3 -m venv venv
 source venv/bin/activate
-pip install -r requirements.txt
+pip install -r requirements-linux.txt #lub pip install -r requirements-windows.txt dla PowerShell
 python3 agent.py
 ```
 
@@ -467,7 +467,7 @@ cd reloaded
 mkdir venv
 python3 -m venv venv
 source venv/bin/activate
-pip install -r requirements.txt
+pip install -r requirements-linux.txt #or pip install -r requirements-windows.txt for PowerShell
 python3 agent.py
 ```
 
