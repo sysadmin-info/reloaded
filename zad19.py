@@ -424,6 +424,7 @@ WAŻY
 
 Wiadomo, że szukana nazwa miejscowości:
 - leży w okolicy Grudziądza (woj. kujawsko-pomorskie),
+- nie ma litery ł ani Ł w nazwie,
 - zaczyna się na "L", kończy na "a",
 - w środku są litery "b", "w", "a".
 
