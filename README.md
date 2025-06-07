@@ -433,6 +433,68 @@ Uruchom plik:
    python sec7.py
 ```
 
+# Zadanie 20 – zad20.py  
+
+**Cel:** Analiza zestawu transkrypcji, wykrycie kłamcy i udzielenie 6 odpowiedzi potrzebnych do zdobycia flagi.
+
+## Minimalne wymagania środowiskowe  
+
+| Zmienna `.env`          | Opis (przykład)                                     |
+|-------------------------|-----------------------------------------------------|
+| `PHONE_URL`             | URL z surowymi transkrypcjami                       |
+| `PHONE_QUESTIONS`       | URL z pytaniami do zadania                          |
+| `PHONE_SORTED_URL`¹     | Posortowane transkrypcje (opcjonalnie ➜ `--use-sorted`) |
+| `REPORT_URL`            | Endpoint do wysyłania odpowiedzi                    |
+| `CENTRALA_API_KEY`      | Twój klucz do centrali                              |
+| `LLM_ENGINE` / `--engine` | openai \| claude \| gemini \| lmstudio \| anything |
+| Klucze silników         | `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, … |
+
+¹ Jeśli nie podasz `--use-sorted`, skrypt sam zrekonstruuje rozmowy z `PHONE_URL`.
+
+## Uruchomienie bezpośrednie  
+
+```bash
+# tryb domyślny (wykryje silnik po kluczu w .env)
+python zad20.py
+
+# wymuszenie silnika i gadatliwe logi
+python zad20.py --engine openai --debug
+
+# użycie pliku z posortowanymi rozmowami
+python zad20.py --engine claude --use-sorted
+````
+
+### Przełączniki
+
+| Flaga          | Działanie                                                                                          |
+| -------------- | -------------------------------------------------------------------------------------------------- |
+| `--engine <e>` | Wymusza backend LLM (openai, claude, gemini, lmstudio, anything). Jeśli pominięte – auto-detekcja. |
+| `--use-sorted` | Pobiera wstępnie posortowany plik z `PHONE_SORTED_URL` i pomija własną heurystykę podziału.        |
+| `--debug`      | Zwiększa szczegółowość logów (INFO ➜ DEBUG).                                                       |
+| `--selftest`   | Uruchamia dwa małe testy offline, bez pobierania danych.                                           |
+
+## Uruchomienie przez **agent.py** („czysta flaga”)
+
+```bash
+python agent.py        # wybierz silnik
+> run_task 20          # agent odpali zad20.py w sub-procesie
+```
+
+* `agent.py` przechwytuje pełne `stdout` zadania, **parsuje tylko fragment `{{FLG:…}}`** i wypisuje go na ekran – reszta logów zostaje schowana.
+* Do debugowania odpalaj zadanie ręcznie (patrz wyżej), wtedy zobaczysz pełny strumień logów.
+
+## Typowy przebieg (tryb debug)
+
+```
+🔄 ENGINE wykryty: openai
+✅ Model: gpt-4o-mini
+=== Zadanie 20 (S05E01): Analiza transkrypcji rozmów - ENHANCED ===
+…
+🏁 {'code': 0, 'message': '{{FLG:...}}'}
+```
+
+Jeżeli wszystko jest poprawnie skonfigurowane (klucze API, zmienne `.env`, model LLM) – flaga pojawi się zarówno przy bezpośrednim uruchomieniu, jak i przez `agent.py`.
+
 ---
 
 # English version
@@ -886,3 +948,65 @@ Run the file:
 ```bash
    python sec7.py
 ```
+
+# Task 20 – zad20.py  
+
+**Goal:** Analyse the transcript set, identify the liar, and provide the 6 answers needed to obtain the flag.
+
+## Minimum environment requirements  
+
+| `.env` variable          | Description (example)                               |
+|--------------------------|-----------------------------------------------------|
+| `PHONE_URL`              | URL with raw transcripts                            |
+| `PHONE_QUESTIONS`        | URL with the task questions                         |
+| `PHONE_SORTED_URL`¹      | Sorted transcripts (optional ➜ `--use-sorted`)      |
+| `REPORT_URL`             | Endpoint for sending answers                        |
+| `CENTRALA_API_KEY`       | Your central API key                                |
+| `LLM_ENGINE` / `--engine`| openai \| claude \| gemini \| lmstudio \| anything  |
+| Engine keys              | `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, … |
+
+¹ If you omit `--use-sorted`, the script will rebuild the conversations from `PHONE_URL` on its own.
+
+## Direct run  
+
+```bash
+# default mode (engine auto-detected from .env keys)
+python zad20.py
+
+# force engine and verbose logs
+python zad20.py --engine openai --debug
+
+# use the file with pre-sorted conversations
+python zad20.py --engine claude --use-sorted
+`````
+
+### Switches
+
+| Flag           | Action                                                                                          |
+| -------------- | ----------------------------------------------------------------------------------------------- |
+| `--engine <e>` | Forces the LLM backend (openai, claude, gemini, lmstudio, anything). If omitted – auto-detect.  |
+| `--use-sorted` | Downloads the pre-sorted file from `PHONE_SORTED_URL` and skips its own segmentation heuristic. |
+| `--debug`      | Increases log verbosity (INFO ➜ DEBUG).                                                         |
+| `--selftest`   | Runs two small offline tests without downloading data.                                          |
+
+## Run via **agent.py** (“clean flag”)
+
+```bash
+python agent.py        # choose the engine
+> run_task 20          # agent will launch zad20.py in a sub-process
+```
+
+* `agent.py` captures the full `stdout` of the task, **parses only the `{{FLG:…}}` fragment**, and prints it – the rest of the logs are hidden.
+* For debugging, run the task manually (see above) to see the full log stream.
+
+## Typical run (debug mode)
+
+```
+🔄 ENGINE detected: openai
+✅ Model: gpt-4o-mini
+=== Task 20 (S05E01): Call transcript analysis – ENHANCED ===
+…
+🏁 {'code': 0, 'message': '{{FLG:...}}'}
+```
+
+If everything is configured correctly (API keys, `.env` variables, LLM model) – the flag will appear both in a direct run and via `agent.py`.
