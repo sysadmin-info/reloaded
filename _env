@@ -76,6 +76,9 @@ NA_SMARTFONA_URL=https://xxx.xxx.xxx/dane/na_smartfona.txt
 LAB_DATA_URL=https://xxx.xxx.xxx/dane/lab_data.zip
 SOFTO_URL=https://xxx.xxx.xxx
 SOFTO_QUESTIONS_URL=https://xxx.xxx.xxx/data/Twój_klucz_z_centrali/softo.json
+PHONE_URL=https://xxx.xxx.xxx/data/Twój_klucz_z_centrali/phone.json
+PHONE_QUESTIONS=https://xxx.xxx.xxx/data/Twój_klucz_z_centrali/phone_questions.json
+PHONE_SORTED_URL=https://xxx.xxx.xxx/data/Twój_klucz_z_centrali/phone_sorted.json
 
 # === Qdrant variables ===
 
