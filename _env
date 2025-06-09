@@ -1,0 +1,108 @@
+# === Anthropic ===
+
+# Claude/Anthropic API
+CLAUDE_API_KEY=sk-ant-api03-twój_klucz_claude_tutaj
+# lub alternatywnie:
+# ANTHROPIC_API_KEY=sk-ant-api03-your_claude_key_here
+
+# Model Claude
+MODEL_NAME_CLAUDE=claude-sonnet-4-20250514
+
+# === OpenAI ===
+# OpenAI API
+OPENAI_API_KEY=sk-proj-twój_klucz_openai_tutaj
+OPENAI_API_URL=https://api.openai.com/v1
+
+# Model do generowania obrazów
+MODEL_NAME_IMAGE=dall-e-3
+
+# Model dla chatu
+MODEL_NAME_OPENAI=gpt-4o
+
+# Model do ropoznawania obrazów
+MODEL_NAME_VISION=gpt-4o
+
+# Model do transkrypcji dźwięku na tekst
+WHISPER_MODEL=base
+
+# === Alphabet / Gemini ===
+# Gemini / Google API
+GEMINI_API_KEY=twój_klucz_gemini_tutaj
+MODEL_NAME_GEMINI=gemini-1.5-pro-latest
+MODEL_NAME_GEMINI_IMAGE=gemini-2.0-flash
+
+# === Local models ===
+# Model dla chatu
+MODEL_NAME_LM=qwen2.5-3b-instruct
+MODEL_NAME_ANY=qwen2.5-3b-instruct
+
+# Model do ropoznawania obrazów
+MODEL_NAME_VISION_LM=llava-v1.5-7b
+MODEL_NAME_VISION_ANY=llava-v1.5-7b
+
+# Model do transkrypcji dźwięku na tekst
+TRANSCRIBE_API_URL=http://localhost:1234/v1
+
+LMSTUDIO_API_URL=http://169.254.83.107:1234/v1 # ustaw zamiast IP localhost, jeśli LM Studio nasłuchuje tylko po localhost a nie po sieci lokalnej. Możesz ustawić LM Studio tak, by nasłuchiwał tylko po localhost, albo w sieci lokalnej. 
+LMSTUDIO_API_KEY=local
+LMSTUDIO_MODEL_EMBED=text-embedding-nomic-embed-text-v1.5
+
+ANYTHING_API_URL=http://169.254.83.107:1234/v1 # ustaw zamiast IP localhost, Anything LLM korzysta z LM Studio, ale można ustawić inny endpoint. 
+ANYTHING_API_KEY=local
+ANYTHING_MODEL_EMBED=text-embedding-nomic-embed-text-v1.5
+
+LOCAL_SD_API_URL=http://localhost:8074
+
+# === AI Devs 3 variables ===
+CENTRALA_API_KEY=Twój_klucz_z_centrali
+REPORT_URL=https://xxx.xxx.xxx/report
+ROBOT_LOGIN_URL=https://xyz.xxx.xxx/
+ROBOT_USERNAME=xxx
+ROBOT_PASSWORD=xxx
+DATA_URL=https://xxx.xxx.xxx/dane/przesluchania.zip
+SOURCE_URL=https://xxx.xxx.xxx/data/Twój_klucz_z_centrali/json.txt
+CENZURA_URL=https://xxx.xxx.xxx/data/Twój_klucz_z_centrali/cenzura.txt
+MAP_IMAGE_PATH=mapa.jpg
+ROBOT_URL=https://xxx.xxx.xxx/data/Twój_klucz_z_centrali/robotid.json
+FABRYKA_URL=https://xxx.xxx.xxx/dane/pliki_z_fabryki.zip
+ARXIV_URL=https://xxx.xxx.xxx/dane/arxiv-draft.html
+ARXIV_QUESTIONS=https://xxx.xxx.xxx/data/Twój_klucz_z_centrali/arxiv.txt
+WEAPONS_PASSWORD=xxx
+APIDB_URL=https://xxx.xxx.xxx/apidb
+PEOPLE_URL=https://xxx.xxx.xxx/people
+PLACES_URL=https://xxx.xxx.xxx/places
+BARBARA_NOTE_URL=https://xxx.xxx.xxx/dane/barbara.txt
+NA_SMARTFONA_URL=https://xxx.xxx.xxx/dane/na_smartfona.txt
+LAB_DATA_URL=https://xxx.xxx.xxx/dane/lab_data.zip
+SOFTO_URL=https://xxx.xxx.xxx
+SOFTO_QUESTIONS_URL=https://xxx.xxx.xxx/data/Twój_klucz_z_centrali/softo.json
+RAFAL_PDF=https://xxx.xxx.xxx/dane/notatnik-rafala.pdf
+NOTES_RAFAL=https://xxx.xxx.xxx/data/Twój_klucz_z_centrali/notes.json
+PHONE_URL=https://xxx.xxx.xxx/data/Twój_klucz_z_centrali/phone.json
+PHONE_QUESTIONS=https://xxx.xxx.xxx/data/Twój_klucz_z_centrali/phone_questions.json
+PHONE_SORTED_URL=https://xxx.xxx.xxx/data/Twój_klucz_z_centrali/phone_sorted.json
+GPS_URL=https://xxx.xxx.xxx/data/Twój_klucz_z_centrali/gps.txt
+GPS_QUESTIONS=https://xxx.xxx.xxx/data/Twój_klucz_z_centrali/gps_question.json
+RAFAL_URL=https://xxx.xxx.xxx/b46c3
+
+# === Qdrant variables ===
+QDRANT_HOST=localhost # you can use IP address instead of localhost
+QDRANT_PORT=6333
+#QDRANT_URL=https://xyz.qdrant.io
+#QDRANT_API_KEY=your_qdrant_key
+
+# === neo4j variables ===
+NEO4J_URI=bolt://localhost:7687
+NEO4J_USER=neo4j
+NEO4J_PASSWORD=YourStrongPassword
+
+# === OCR ===
+# Tesseract - ustawienie lokalizacji dla ścieżki z językiem polskim
+export TESSDATA_PREFIX=/usr/share/tesseract-ocr/5/tessdata/
+
+# === VIDEO ===
+VIMEO_URL=https://player.vimeo.com/video/xxxxxxxxxx?h=xxxxxxxxxx
+
+# === OPCJE DEBUGOWANIA ===
+# Pokazuj szczegółowe logi myślenia LLM
+DEBUG_THINKING=true

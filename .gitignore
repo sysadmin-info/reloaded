@@ -1,0 +1,36 @@
+# Wirtualne środowisko
+venv/
+dev-venv/
+
+# Plik z zmiennymi środowiskowymi
+.env
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+
+# Logi i tymczasowe
+*.log
+*.tmp
+
+# katalogi
+cache
+debug
+przesluchania
+fabryka
+fabryka_data
+qdrant_storage
+neo4j_data
+azyl
+vimeo_downloads
+lab_data
+notatnik_data
+
+# Inne pliki
+flags.json
+poprawiony_json.json
+secrets.json
+payload.json
+raw_classification.json
+wynik.json
+.cache_context.json
