@@ -64,7 +64,7 @@ Wykonaj poniższe polecenia:
 py -3.11 -m venv "dev-venv"
 \dev-venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip setuptools wheel
-pip install openai-whisper requests opencv-python pytesseract langdetect langchain-core langchain-openai langchain-google-genai langgraph dotenv bs4 google.generativeai
+pip install openai-whisper requests opencv-python pytesseract langdetect langchain-core langchain-openai langchain-google-genai langgraph python-dotenv bs4 google.generativeai
 ```
 
 Zainstaluj Chocolatey, postępując zgodnie z tym przewodnikiem: [Chocolatey](https://docs.chocolatey.org/en-us/choco/setup/), a następnie zainstaluj ffmpeg i tesseract.
@@ -400,9 +400,7 @@ Przeczytaj plik README_WEBHOOK_PL.md Zalecam model: qwen3-asteria-14b-128k dla L
 4. **Wymagana instalacja pakietów**:
 
 ```bash
-pip install frontend
-pip install PyMuPDF
-pip install Pillow
+pip install frontend PyMuPDF Pillow
 ```
 
 ## Uruchomienie:
@@ -711,7 +709,7 @@ Execute the below commands:
 py -3.11 -m venv "dev-venv"
 \dev-venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip setuptools wheel
-pip install openai-whisper requests opencv-python pytesseract langdetect langchain-core langchain-openai langchain-google-genai langgraph dotenv bs4 google.generativeai
+pip install openai-whisper requests opencv-python pytesseract langdetect langchain-core langchain-openai langchain-google-genai langgraph python-dotenv bs4 google.generativeai
 ```
 
 Install choco using this guide: [Chocolatey](https://docs.chocolatey.org/en-us/choco/setup/ )
@@ -1064,9 +1062,7 @@ Read the README_WEBHOOK_EN.md file. I recommend model: qwen3-asteria-14b-128k df
 4. **Required package installation**:
 
 ```bash
-pip install frontend
-pip install PyMuPDF
-pip install Pillow
+pip install frontend PyMuPDF Pillow
 ````
 
 ## Execution:

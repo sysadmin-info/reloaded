@@ -40,7 +40,3 @@ wynik.json
 .cache_context.json
 .chromadb_story/
 rafal_notebook.pdf
-story_solver.py
-super-agent.py
-zad24.py
-zad25.py
