@@ -21,10 +21,14 @@ fabryka
 fabryka_data
 qdrant_storage
 neo4j_data
+postgres_data
 azyl
 vimeo_downloads
 lab_data
 notatnik_data
+story_data
+audio_files
+chroma_db
 
 # Inne pliki
 flags.json
@@ -34,3 +38,9 @@ payload.json
 raw_classification.json
 wynik.json
 .cache_context.json
+.chromadb_story/
+rafal_notebook.pdf
+story_solver.py
+super-agent.py
+zad24.py
+zad25.py

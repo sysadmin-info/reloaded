@@ -84,6 +84,10 @@ PHONE_SORTED_URL=https://xxx.xxx.xxx/data/Twój_klucz_z_centrali/phone_sorted.js
 GPS_URL=https://xxx.xxx.xxx/data/Twój_klucz_z_centrali/gps.txt
 GPS_QUESTIONS=https://xxx.xxx.xxx/data/Twój_klucz_z_centrali/gps_question.json
 RAFAL_URL=https://xxx.xxx.xxx/b46c3
+ZYGFRYD_PDF=https://xxx.xxx.xxx/dane/zygfryd_notatnik.zip
+BLOG_URL=https://rafal.xxx.xxx/blogXYZ/
+STORY_URL=https://xxx.xxx.xxx/data/Twój_klucz_z_centrali/story.json
+DNS_URL=rafal.xxx.xxx
 
 # === Qdrant variables ===
 QDRANT_HOST=localhost # you can use IP address instead of localhost
@@ -95,6 +99,13 @@ QDRANT_PORT=6333
 NEO4J_URI=bolt://localhost:7687
 NEO4J_USER=neo4j
 NEO4J_PASSWORD=YourStrongPassword
+
+# === PostgreSQL variables ===
+PG_HOST=localhost
+PG_PORT=5432
+PG_DB=agent
+PG_USER=postgres
+PG_PASS=secret
 
 # === OCR ===
 # Tesseract - ustawienie lokalizacji dla ścieżki z językiem polskim
