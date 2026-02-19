@@ -608,8 +608,8 @@ Uruchom plik:
 pip install -r requirements-linux.txt #lub pip install -r requirements-windows.txt dla PowerShell
 
 # Podstawowe uruchomienie
-python story_solver.py --engine openai --debug
-python story_solver.py --engine claude
+python zad24.py --engine openai --debug
+python zad24.py --engine claude
 ```
 
 ### Konfiguracja środowiska:
@@ -1293,8 +1293,8 @@ Run the file:
 pip install -r requirements-linux.txt #or pip install -r requirements-windows.txt for PowerShell
 
 # Basic run
-python story_solver.py --engine openai --debug
-python story_solver.py --engine claude
+python zad24.py --engine openai --debug
+python zad24.py --engine claude
 ```
 
 ### Environment Setup:
