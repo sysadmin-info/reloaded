@@ -144,6 +144,27 @@ Wszystko masz skonfigurowane **wzorowo**!
 Jakbyś chciał „hybrydę” — np. dodatkowe info na wyjściu przez agenta - daj znać, podam gotową zmianę do `agent.py`.
 Możesz też wrzucać `print(..., file=sys.stderr)` i przekierować je, jeśli chcesz np. debug na stderr a flagę na stdout (do własnych automatyzacji).
 
+# Zadanie 5 - zad4.py
+
+uruchomienie za pomocą GLiNER z wiersza poleceń:
+
+```bash
+python zad4.py --engine gliner
+python zad4.py --engine gliner --gliner-threshold 0.35
+python zad4.py --engine gliner --gliner-model knowledgator/gliner-pii-base-v1.0
+```
+
+**Jak GLiNER działa w tym kodzie** — podmiana na `char_offsets`, nie "przepisanie przez LLM":
+
+```
+tekst:     "Dane podejrzanego: Jan Kowalski, lat 45, mieszka w Krakowie, ul. Polna 8."
+encja:      start=60, end=72, label="street address", text="ul. Polna 8"
+podmiana:  tekst[:64] + "CENZURA" + tekst[72:]   # start przesuwa się za prefiks "ul. "
+wynik:     "Dane podejrzanego: CENZURA, lat CENZURA, mieszka w CENZURA, ul. CENZURA."
+```
+
+Prefiksy adresowe (`ul.`, `al.`, `pl.`, `os.`) są zachowywane — kod przesuwa `start` za prefiks przed podmianą, jeśli span od niego się zaczyna.
+
 # Zadanie 12 - zad12.py
 
 ## Uruchomienie Qdrant w Docker:
@@ -791,6 +812,27 @@ Everything is configured **perfectly**!
 
 If you'd like a “hybrid” version — e.g., additional info shown when running via agent — let me know and I’ll provide a ready-made change for `agent.py`.  
 You can also use `print(..., file=sys.stderr)` and redirect it if you want debug info on stderr and flags on stdout (for your own automation setups).
+
+# Task 5 - zad4.py
+
+Run with GLiNER from the command line:
+
+```bash
+python zad4.py --engine gliner
+python zad4.py --engine gliner --gliner-threshold 0.35
+python zad4.py --engine gliner --gliner-model knowledgator/gliner-pii-base-v1.0
+```
+
+**How GLiNER works in this code** — substitution with `char_offsets`, not “rewriting by LLM”:
+
+```
+text:     “Suspect's details: Jan Kowalski, 45 years old, lives in Krakow, 8 Polna Street.”
+essence:      start=60, end=72, label="street address", text="ul. Polna 8"
+replacement:  text[:64] + “CENSORED” + text[72:]   # start moves after the prefix “ul. ”
+result:     “Suspect's details: CENSORED, age CENSORED, residing at CENSORED, CENSORED Street.”
+```
+
+Address prefixes (`ul.`, `al.`, `pl.`, `os.`) are preserved — the code moves `start` after the prefix before replacement if the span begins with it.
 
 # Task 12 - zad12.py
 
